@@ -10,6 +10,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   wallet = new WalletService();
   await wallet.initialize();
 
+  // Load and set saved API URL
+  await loadSavedApiUrl();
+
   // Check if user is logged in
   if (wallet.isLoggedIn() && !wallet.isLocked) {
     showScreen('wallet');
@@ -24,6 +27,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // Setup all event listeners
 function setupEventListeners() {
+  // API service selectors
+  document.getElementById('login-api-service').addEventListener('change', handleLoginApiChange);
+  document.getElementById('create-api-service').addEventListener('change', handleCreateApiChange);
+  
   // Login form
   document.getElementById('login-btn').addEventListener('click', handleLogin);
   document.getElementById('show-create-btn').addEventListener('click', () => {
@@ -76,6 +83,85 @@ function setupEventListeners() {
   document.getElementById('logout-btn').addEventListener('click', handleLogout);
 }
 
+// Load saved API URL and set it in the selects
+async function loadSavedApiUrl() {
+  const savedUrl = await wallet.getNodeUrl();
+  const loginSelect = document.getElementById('login-api-service');
+  const createSelect = document.getElementById('create-api-service');
+  
+  // Check if saved URL matches one of the preset options
+  const loginOptions = Array.from(loginSelect.options).map(opt => opt.value);
+  const createOptions = Array.from(createSelect.options).map(opt => opt.value);
+  
+  if (loginOptions.includes(savedUrl)) {
+    loginSelect.value = savedUrl;
+  } else if (savedUrl && savedUrl !== 'http://localhost:8080') {
+    // Custom URL
+    loginSelect.value = 'custom';
+    document.getElementById('login-custom-api-group').classList.remove('hidden');
+    document.getElementById('login-custom-api').value = savedUrl;
+  }
+  
+  if (createOptions.includes(savedUrl)) {
+    createSelect.value = savedUrl;
+  } else if (savedUrl && savedUrl !== 'http://localhost:8080') {
+    // Custom URL
+    createSelect.value = 'custom';
+    document.getElementById('create-custom-api-group').classList.remove('hidden');
+    document.getElementById('create-custom-api').value = savedUrl;
+  }
+}
+
+// Handle API service selection for login
+function handleLoginApiChange() {
+  const select = document.getElementById('login-api-service');
+  const customGroup = document.getElementById('login-custom-api-group');
+  
+  if (select.value === 'custom') {
+    customGroup.classList.remove('hidden');
+  } else {
+    customGroup.classList.add('hidden');
+  }
+}
+
+// Handle API service selection for create
+function handleCreateApiChange() {
+  const select = document.getElementById('create-api-service');
+  const customGroup = document.getElementById('create-custom-api-group');
+  
+  if (select.value === 'custom') {
+    customGroup.classList.remove('hidden');
+  } else {
+    customGroup.classList.add('hidden');
+  }
+}
+
+// Get selected API URL from login form
+function getLoginApiUrl() {
+  const select = document.getElementById('login-api-service');
+  if (select.value === 'custom') {
+    const customUrl = document.getElementById('login-custom-api').value.trim();
+    if (!customUrl) {
+      throw new Error('Please enter a custom API URL');
+    }
+    return customUrl;
+  }
+  return select.value;
+}
+
+// Get selected API URL from create form
+function getCreateApiUrl() {
+  const select = document.getElementById('create-api-service');
+  if (select.value === 'custom') {
+    const customUrl = document.getElementById('create-custom-api').value.trim();
+    if (!customUrl) {
+      throw new Error('Please enter a custom API URL');
+    }
+    return customUrl;
+  }
+  return select.value;
+}
+
 // Handle login
 async function handleLogin() {
   const username = document.getElementById('login-username').value.trim();
@@ -90,6 +176,10 @@ async function handleLogin() {
   showLoading('Logging in...');
 
   try {
+    // Set the selected API URL before login
+    const apiUrl = getLoginApiUrl();
+    await wallet.updateNodeUrl(apiUrl);
+    
     await wallet.login(username, password, pin);
     showScreen('wallet');
     await loadWalletData();
@@ -138,6 +228,10 @@ async function handleCreateWallet() {
   showLoading('Creating wallet...');
 
   try {
+    // Set the selected API URL before creating wallet
+    const apiUrl = getCreateApiUrl();
+    await wallet.updateNodeUrl(apiUrl);
+    
     await wallet.createWallet(username, password, pin);
     showScreen('wallet');
     await loadWalletData();

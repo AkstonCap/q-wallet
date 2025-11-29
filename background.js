@@ -178,7 +178,7 @@ chrome.runtime.onConnect.addListener((port) => {
   });
 });
 
-// Periodic balance refresh (every 5 minutes)
+// Periodic balance refresh (every 50 seconds)
 setInterval(async () => {
   if (wallet && wallet.isLoggedIn()) {
     try {
@@ -188,6 +188,18 @@ setInterval(async () => {
       console.error('Failed to refresh wallet data:', error);
     }
   }
-}, 5 * 60 * 1000);
+}, 50 * 1000);
+
+// Security: Automatically terminate session when browser closes
+chrome.runtime.onSuspend.addListener(async () => {
+  console.log('Browser closing, terminating Nexus session for security');
+  if (wallet && wallet.isLoggedIn()) {
+    try {
+      await wallet.logout();
+    } catch (error) {
+      console.error('Failed to terminate session on browser close:', error);
+    }
+  }
+});
 
 console.log('Nexus Wallet background service worker loaded');

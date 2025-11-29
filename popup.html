@@ -19,6 +19,18 @@
         <div id="login-form" class="form-container">
           <h2>Welcome Back</h2>
           <div class="form-group">
+            <label for="login-api-service">API Service</label>
+            <select id="login-api-service" class="api-select">
+              <option value="https://api.distordia.com">api.distordia.com</option>
+              <option value="http://localhost:8080">localhost:8080</option>
+              <option value="custom">Custom URL...</option>
+            </select>
+          </div>
+          <div class="form-group hidden" id="login-custom-api-group">
+            <label for="login-custom-api">Custom API URL</label>
+            <input type="text" id="login-custom-api" placeholder="http://your-node:8080">
+          </div>
+          <div class="form-group">
             <label for="login-username">Username</label>
             <input type="text" id="login-username" placeholder="Enter username" autocomplete="username">
           </div>
@@ -37,6 +49,18 @@
 
         <div id="create-form" class="form-container hidden">
           <h2>Create New Wallet</h2>
+          <div class="form-group">
+            <label for="create-api-service">API Service</label>
+            <select id="create-api-service" class="api-select">
+              <option value="https://api.distordia.com">api.distordia.com</option>
+              <option value="http://localhost:8080">localhost:8080</option>
+              <option value="custom">Custom URL...</option>
+            </select>
+          </div>
+          <div class="form-group hidden" id="create-custom-api-group">
+            <label for="create-custom-api">Custom API URL</label>
+            <input type="text" id="create-custom-api" placeholder="http://your-node:8080">
+          </div>
           <div class="form-group">
             <label for="create-username">Username</label>
             <input type="text" id="create-username" placeholder="Choose username" autocomplete="off">

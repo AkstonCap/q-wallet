@@ -388,7 +388,19 @@ body {
   transition: all 0.2s;
 }
 
-.form-group input:focus {
+.form-group select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.2s;
+  background-color: white;
+  cursor: pointer;
+}
+
+.form-group input:focus,
+.form-group select:focus {
   outline: none;
   border-color: var(--primary-color);
   box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);

@@ -190,14 +190,37 @@ setInterval(async () => {
   }
 }, 50 * 1000);
 
-// Security: Automatically terminate session when browser closes
-chrome.runtime.onSuspend.addListener(async () => {
-  console.log('Browser closing, terminating Nexus session for security');
-  if (wallet && wallet.isLoggedIn()) {
+// Security: Terminate session when browser closes or extension is disabled
+// Listen for session storage changes (cleared when browser closes)
+chrome.storage.session.onChanged.addListener(async (changes) => {
+  // If session data was removed (browser closing)
+  if (changes.session && !changes.session.newValue && changes.session.oldValue) {
+    console.log('Session data cleared, terminating Nexus session');
     try {
-      await wallet.logout();
+      const sessionData = changes.session.oldValue;
+      if (sessionData && sessionData.session) {
+        const storage = new StorageService();
+        const nodeUrl = await storage.getNodeUrl();
+        const api = new NexusAPI(nodeUrl);
+        await api.terminateSession(sessionData.session);
+        console.log('Nexus session terminated successfully');
+      }
     } catch (error) {
-      console.error('Failed to terminate session on browser close:', error);
+      console.error('Failed to terminate Nexus session:', error);
+    }
+  }
+});
+
+// Also handle extension being disabled/uninstalled
+chrome.management.onDisabled.addListener(async (info) => {
+  if (info.id === chrome.runtime.id) {
+    console.log('Extension disabled, terminating session');
+    if (wallet && wallet.isLoggedIn()) {
+      try {
+        await wallet.logout();
+      } catch (error) {
+        console.error('Failed to terminate session on disable:', error);
+      }
     }
   }
 });

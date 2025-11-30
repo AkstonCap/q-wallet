@@ -61,13 +61,20 @@ class NexusAPI {
   async unlockSession(pin, session) {
     return this.request('sessions/unlock/local', {
       pin,
-      session
+      session,
+      notifications: true,
+      transactions: true
     });
   }
 
   // Lock session
-  async lockSession(session) {
-    return this.request('sessions/lock/local', { session });
+  async lockSession(pin, session) {
+    return this.request('sessions/lock/local', {
+      pin,
+      session,
+      notifications: false,
+      transactions: false
+    });
   }
 
   // Get session status

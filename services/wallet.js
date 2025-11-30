@@ -48,18 +48,15 @@ class WalletService {
       this.session = sessionResult.session;
       this.genesis = sessionResult.genesis;
       this.username = username;
-      this.isLocked = false;
+      this.isLocked = true; // Session starts locked
 
-      // Save session
+      // Save session to sessionStorage (cleared when browser closes)
       await this.storage.saveSession({
         session: this.session,
         genesis: this.genesis,
         username: this.username,
-        isLocked: false
+        isLocked: true
       });
-
-      // Create default account
-      await this.createAccount('default');
 
       return {
         success: true,
@@ -77,17 +74,25 @@ class WalletService {
     try {
       const result = await this.api.createSession(username, password, pin);
       
-      this.session = result.session;
-      this.genesis = result.genesis;
+      console.log('Login result:', result);
+      
+      // Handle both direct response and wrapped result
+      const sessionData = result.result || result;
+      
+      this.session = sessionData.session;
+      this.genesis = sessionData.genesis;
       this.username = username;
-      this.isLocked = false;
+      this.isLocked = true; // Session starts locked
+      
+      console.log('Session set:', this.session);
+      console.log('Genesis set:', this.genesis);
 
-      // Save session
+      // Save session to sessionStorage (cleared when browser closes)
       await this.storage.saveSession({
         session: this.session,
         genesis: this.genesis,
         username: this.username,
-        isLocked: false
+        isLocked: true
       });
 
       return {
@@ -107,7 +112,7 @@ class WalletService {
       await this.api.unlockSession(pin, this.session);
       this.isLocked = false;
 
-      // Update session
+      // Update session in sessionStorage
       await this.storage.saveSession({
         session: this.session,
         genesis: this.genesis,
@@ -123,15 +128,15 @@ class WalletService {
   }
 
   // Lock wallet
-  async lock() {
+  async lock(pin) {
     try {
       if (this.session) {
-        await this.api.lockSession(this.session);
+        await this.api.lockSession(pin, this.session);
       }
       
       this.isLocked = true;
 
-      // Update session
+      // Update session in sessionStorage
       await this.storage.saveSession({
         session: this.session,
         genesis: this.genesis,

@@ -183,10 +183,19 @@ async function handleLogin() {
     await wallet.login(username, password, pin);
     showScreen('wallet');
     await loadWalletData();
+    hideLoading();
     showNotification('Login successful!', 'success');
+    
+    // Unlock session for notifications and transactions
+    try {
+      await wallet.unlock(pin);
+      showNotification('Session unlocked', 'success');
+    } catch (unlockError) {
+      showNotification('Warning: Session is locked. Some features may be unavailable.', 'warning');
+      console.error('Failed to unlock session:', unlockError);
+    }
   } catch (error) {
     showNotification('Login failed: ' + error.message, 'error');
-  } finally {
     hideLoading();
   }
 }
@@ -235,10 +244,19 @@ async function handleCreateWallet() {
     await wallet.createWallet(username, password, pin);
     showScreen('wallet');
     await loadWalletData();
+    hideLoading();
     showNotification('Wallet created successfully!', 'success');
+    
+    // Unlock session for notifications and transactions
+    try {
+      await wallet.unlock(pin);
+      showNotification('Session unlocked', 'success');
+    } catch (unlockError) {
+      showNotification('Warning: Session is locked. Some features may be unavailable.', 'warning');
+      console.error('Failed to unlock session:', unlockError);
+    }
   } catch (error) {
     showNotification('Failed to create wallet: ' + error.message, 'error');
-  } finally {
     hideLoading();
   }
 }
@@ -452,12 +470,18 @@ async function handleSaveNode() {
 
 // Handle lock wallet
 async function handleLockWallet() {
+  const pin = prompt('Enter your PIN to lock the wallet:');
+  
+  if (!pin) {
+    return; // User cancelled
+  }
+
   try {
-    await wallet.lock();
+    await wallet.lock(pin);
     showScreen('login');
     showNotification('Wallet locked', 'success');
   } catch (error) {
-    showNotification('Failed to lock wallet', 'error');
+    showNotification('Failed to lock wallet: ' + error.message, 'error');
   }
 }
 

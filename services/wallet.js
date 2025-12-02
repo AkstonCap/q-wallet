@@ -252,9 +252,9 @@ class WalletService {
   }
 
   // Get transaction history
-  async getTransactions(limit = 100) {
+  async getTransactions(accountName = 'default', limit = 100) {
     try {
-      const transactions = await this.api.getTransactions(this.session, limit);
+      const transactions = await this.api.getTransactions(accountName, this.session, limit);
       
       // Cache transactions
       await this.storage.saveTransactions(transactions);

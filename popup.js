@@ -304,7 +304,7 @@ async function loadWalletData() {
 // Load transactions
 async function loadTransactions() {
   try {
-    const transactions = await wallet.getTransactions(50);
+    const transactions = await wallet.getTransactions('default', 50);
     const container = document.getElementById('transactions-list');
 
     if (!transactions || transactions.length === 0) {

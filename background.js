@@ -83,7 +83,7 @@ async function handleMessage(request, sender) {
       return { result: await wallet.send(params.account, params.amount, params.recipient, params.reference) };
     
     case 'transaction.getHistory':
-      return { result: await wallet.getTransactions(params.limit) };
+      return { result: await wallet.getTransactions(params.account || 'default', params.limit) };
     
     case 'transaction.getDetails':
       return { result: await wallet.getTransactionDetails(params.txid) };
@@ -183,7 +183,7 @@ setInterval(async () => {
   if (wallet && wallet.isLoggedIn()) {
     try {
       await wallet.getBalance('default');
-      await wallet.getTransactions(50);
+      await wallet.getTransactions('default', 50);
     } catch (error) {
       console.error('Failed to refresh wallet data:', error);
     }

@@ -196,9 +196,15 @@
     <div id="receive-screen" class="screen hidden">
       <div class="header">
         <button id="back-from-receive-btn" class="back-btn">← Back</button>
-        <h2>Receive NXS</h2>
+        <h2>Receive</h2>
       </div>
       <div class="content center">
+        <div class="form-group">
+          <label for="receive-account-select">Select Account</label>
+          <select id="receive-account-select" class="account-select">
+            <option value="">Loading accounts...</option>
+          </select>
+        </div>
         <div class="qr-container">
           <canvas id="qr-code"></canvas>
         </div>
@@ -210,7 +216,7 @@
           <button id="copy-address-btn" class="btn btn-secondary">Copy Address</button>
         </div>
         <div class="receive-info">
-          Share this address to receive NXS or other Nexus tokens
+          Share this address to receive tokens
         </div>
       </div>
     </div>
@@ -275,6 +281,9 @@
     </div>
   </div>
 
+  <!-- QR Code Library -->
+  <script src="lib/qrcode-simple.js"></script>
+  
   <!-- Load services first -->
   <script src="services/storage.js"></script>
   <script src="services/nexus-api.js"></script>

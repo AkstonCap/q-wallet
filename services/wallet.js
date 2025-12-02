@@ -285,7 +285,7 @@ class WalletService {
   // Get transaction history
   async getTransactions(accountName = 'default', limit = 100) {
     try {
-      const transactions = await this.api.getTransactions(this.session, limit, accountName);
+      const transactions = await this.api.getTransactions(accountName, this.session, limit);
       
       // Cache transactions
       await this.storage.saveTransactions(transactions);
@@ -295,16 +295,6 @@ class WalletService {
       console.error('Failed to get transactions:', error);
       // Return cached transactions if available
       return await this.storage.getTransactions();
-    }
-  }
-
-  // Get transaction details
-  async getTransactionDetails(txid) {
-    try {
-      return await this.api.getTransaction(txid);
-    } catch (error) {
-      console.error('Failed to get transaction details:', error);
-      throw error;
     }
   }
 

@@ -76,6 +76,7 @@ function setupEventListeners() {
   // Receive screen
   document.getElementById('back-from-receive-btn').addEventListener('click', () => showScreen('wallet'));
   document.getElementById('copy-address-btn').addEventListener('click', copyReceiveAddress);
+  document.getElementById('receive-account-select').addEventListener('change', handleReceiveAccountChange);
 
   // Settings screen
   document.getElementById('back-from-settings-btn').addEventListener('click', () => showScreen('wallet'));
@@ -275,8 +276,16 @@ async function loadWalletData() {
     // Update account info
     document.getElementById('account-name').textContent = walletInfo.username || 'Default Account';
     
+    console.log('Loading accounts...');
     // Get all accounts (each token has its own account with unique address)
     const accounts = await wallet.listAccounts();
+    console.log('Accounts loaded:', accounts);
+    
+    // Check if accounts is an array
+    if (!Array.isArray(accounts)) {
+      console.error('Expected accounts to be an array, got:', typeof accounts, accounts);
+      throw new Error('Invalid accounts response from API');
+    }
     
     // Find the default NXS account for main display
     const defaultAccount = accounts.find(acc => acc.name === 'default' && (acc.token === '0' || acc.ticker === 'NXS'));
@@ -288,6 +297,16 @@ async function loadWalletData() {
       
       // Display NXS balance
       document.getElementById('balance-amount').textContent = formatAmount(defaultAccount.balance);
+    } else {
+      console.warn('No default NXS account found in accounts:', accounts);
+      // Show first account if available
+      if (accounts.length > 0) {
+        const firstAccount = accounts[0];
+        const truncatedAddress = truncateAddress(firstAccount.address);
+        document.getElementById('address-text').textContent = truncatedAddress;
+        document.getElementById('address-text').setAttribute('data-full-address', firstAccount.address);
+        document.getElementById('balance-amount').textContent = formatAmount(firstAccount.balance || 0);
+      }
     }
 
     // Load tokens list with all accounts
@@ -297,7 +316,8 @@ async function loadWalletData() {
     await loadTransactions();
   } catch (error) {
     console.error('Failed to load wallet data:', error);
-    showNotification('Failed to load wallet data', 'error');
+    console.error('Error details:', error.message, error.stack);
+    showNotification('Failed to load wallet data: ' + error.message, 'error');
   }
 }
 
@@ -515,35 +535,104 @@ function updateTransactionSummary() {
 // Show receive address
 async function showReceiveAddress() {
   try {
-    const address = await wallet.getAccountAddress('default');
+    // Load all accounts
+    const accounts = await wallet.listAccounts();
+    
+    // Populate account selector
+    const select = document.getElementById('receive-account-select');
+    select.innerHTML = '';
+    
+    accounts.forEach(account => {
+      const option = document.createElement('option');
+      option.value = account.address;
+      option.textContent = `${account.name || 'Unnamed'} (${account.ticker || 'Token'}) - ${formatAmount(account.balance || 0)}`;
+      option.dataset.name = account.name;
+      option.dataset.ticker = account.ticker;
+      select.appendChild(option);
+    });
+    
+    // Select default account if available
+    const defaultAccount = accounts.find(acc => acc.name === 'default');
+    if (defaultAccount) {
+      select.value = defaultAccount.address;
+    }
+    
+    // Display selected account
+    if (accounts.length > 0) {
+      await updateReceiveDisplay(select.value);
+    } else {
+      showNotification('No accounts found', 'warning');
+    }
+  } catch (error) {
+    console.error('Failed to load accounts for receive:', error);
+    showNotification('Failed to load accounts', 'error');
+  }
+}
+
+// Handle account selection change on receive screen
+async function handleReceiveAccountChange() {
+  const select = document.getElementById('receive-account-select');
+  await updateReceiveDisplay(select.value);
+}
+
+// Update receive display with selected account address
+async function updateReceiveDisplay(address) {
+  try {
     document.getElementById('receive-address-text').textContent = address;
     
     // Generate QR code
-    generateQRCode(address);
+    await generateQRCode(address);
   } catch (error) {
-    console.error('Failed to show receive address:', error);
-    showNotification('Failed to load address', 'error');
+    console.error('Failed to update receive display:', error);
+    showNotification('Failed to display address', 'error');
   }
 }
 
 // Generate QR code
-function generateQRCode(text) {
+async function generateQRCode(text) {
   const canvas = document.getElementById('qr-code');
-  const size = 200;
   
-  // Simple QR code placeholder (in production, use a QR code library)
-  const ctx = canvas.getContext('2d');
-  canvas.width = size;
-  canvas.height = size;
-  
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, size, size);
-  
-  ctx.fillStyle = '#000000';
-  ctx.font = '12px monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('QR Code', size / 2, size / 2 - 10);
-  ctx.fillText('(Install QR library)', size / 2, size / 2 + 10);
+  try {
+    // Check if SimpleQRCode library is loaded
+    if (typeof SimpleQRCode !== 'undefined') {
+      // Generate QR code using our library
+      await SimpleQRCode.toCanvas(canvas, text, {
+        width: 200,
+        margin: 4,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      });
+    } else {
+      // Fallback to simple pattern
+      const size = 200;
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, size, size);
+      
+      ctx.fillStyle = '#000000';
+      ctx.font = '12px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('QR library loading...', size / 2, size / 2);
+    }
+  } catch (error) {
+    console.error('Failed to generate QR code:', error);
+    // Draw error message
+    const size = 200;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = '#ff0000';
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('QR Error', size / 2, size / 2);
+  }
 }
 
 // Copy address

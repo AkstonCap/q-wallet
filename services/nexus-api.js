@@ -72,8 +72,8 @@ class NexusAPI {
     return this.request('sessions/lock/local', {
       pin,
       session,
-      notifications: true,
-      transactions: true
+      notifications: false,
+      transactions: false
     });
   }
 
@@ -102,15 +102,19 @@ class NexusAPI {
 
   // Get account balance
   async getAccount(name = 'default', session) {
-    return this.request('finance/get/account', {
+    const response = await this.request('finance/get/account', {
       name,
       session
     });
+    // API returns object directly in result property
+    return response.result || response;
   }
 
   // List all accounts
   async listAccounts(session) {
-    return this.request('finance/list/account', { session });
+    const response = await this.request('finance/list/account', { session });
+    // API returns array directly in result property
+    return response.result || response;
   }
 
   // Get balances for all accounts
@@ -146,41 +150,20 @@ class NexusAPI {
     });
   }
 
-  // Get transaction history
-  async getTransactions(session, limit = 20, name = 'default') {
-    return this.request('finance/transactions/account', {
+  // Get transactions for given account with name
+  async getTransactions(name = 'default', session, limit = 20, sort = 'timestamp', order = 'desc') {
+    const response = await this.request('finance/transactions/account', {
       name,
       session,
       limit,
-      sort: 'timestamp',
-      order: 'desc'
+      sort,
+      order
     });
-  }
-
-  // Get stake info
-  async getStakeInfo(session) {
-    return this.request('finance/get/stakeinfo', { session });
+    // API returns array directly in result property
+    return response.result || response;
   }
 
   // ===== LEDGER API =====
-
-  // Get transaction details
-  async getTransaction(txid) {
-    return this.request('ledger/get/transaction', { txid });
-  }
-
-  // List transactions for a genesis ID
-  async listTransactionsByGenesis(genesis, limit = 100) {
-    return this.request('ledger/list/transactions', {
-      genesis,
-      limit
-    });
-  }
-
-  // Get block information
-  async getBlock(hash) {
-    return this.request('ledger/get/block', { hash });
-  }
 
   // Get blockchain info
   async getInfo() {

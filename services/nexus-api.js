@@ -110,7 +110,7 @@ class NexusAPI {
 
   // List all accounts
   async listAccounts(session) {
-    return this.request('finance/list/accounts', { session });
+    return this.request('finance/list/account', { session });
   }
 
   // Get balances for all accounts
@@ -130,9 +130,9 @@ class NexusAPI {
   // Send NXS or tokens (debit)
   async debit(accountName, amount, recipientAddress, reference = '', session) {
     return this.request('finance/debit/account', {
-      name: accountName,
+      from: accountName,
       amount: parseFloat(amount),
-      name_to: recipientAddress,
+      to: recipientAddress,
       reference,
       session
     });
@@ -147,8 +147,9 @@ class NexusAPI {
   }
 
   // Get transaction history
-  async getTransactions(session, limit = 100) {
+  async getTransactions(name = 'default', session, limit = 100) {
     return this.request('finance/transactions/account', {
+      name,
       session,
       limit
     });
@@ -191,10 +192,6 @@ class NexusAPI {
     return this.request('system/get/info');
   }
 
-  // List peers
-  async listPeers() {
-    return this.request('system/list/peers');
-  }
 }
 
 // Export for use in other modules

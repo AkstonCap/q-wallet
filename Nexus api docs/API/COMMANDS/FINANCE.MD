@@ -578,6 +578,10 @@ List out all the transactions for the token address.
 
 `session` : Required by **argument** `-multiuser=1` to be supplied to identify the user session. For single-user API mode the session should not be supplied. 
 
+`name` : Required for **transactions/account** and **transactions/token** to define account/token, but not needed if account/token **address** is given.
+
+`address` : Required for **transactions/account** and **transactions/token** to define account/token, but not needed if account/token **address** is given.
+
 `verbose` : Optional, determines how much **transaction data** to include in the response. Supported values are :
 - default : hash.
 

@@ -190,19 +190,19 @@ setInterval(async () => {
   }
 }, 50 * 1000);
 
-// Security: Terminate session when browser closes or extension is disabled
-// Listen for session storage changes (cleared when browser closes)
-chrome.storage.session.onChanged.addListener(async (changes) => {
-  // If session data was removed (browser closing)
-  if (changes.session && !changes.session.newValue && changes.session.oldValue) {
-    console.log('Session data cleared, terminating Nexus session');
+// Security: Terminate session when service worker is about to be terminated
+// This happens when the browser closes or the extension is reloaded
+self.addEventListener('beforeunload', async () => {
+  console.log('Service worker terminating, cleaning up session');
+  if (wallet && wallet.isLoggedIn()) {
     try {
-      const sessionData = changes.session.oldValue;
-      if (sessionData && sessionData.session) {
+      const sessionInfo = wallet.getSessionInfo();
+      if (sessionInfo && sessionInfo.session) {
         const storage = new StorageService();
         const nodeUrl = await storage.getNodeUrl();
         const api = new NexusAPI(nodeUrl);
-        await api.terminateSession(sessionData.session);
+        await api.terminateSession(sessionInfo.session);
+        await storage.clearSession(); // Clear session from storage
         console.log('Nexus session terminated successfully');
       }
     } catch (error) {
@@ -220,6 +220,31 @@ chrome.management.onDisabled.addListener(async (info) => {
         await wallet.logout();
       } catch (error) {
         console.error('Failed to terminate session on disable:', error);
+      }
+    }
+  }
+});
+
+// Clean up session data when browser window is closed
+// Listen for all windows being removed
+chrome.windows.onRemoved.addListener(async (windowId) => {
+  const windows = await chrome.windows.getAll();
+  if (windows.length === 0) {
+    // Last window closed, clean up session
+    console.log('Last browser window closed, terminating session');
+    if (wallet && wallet.isLoggedIn()) {
+      try {
+        const sessionInfo = wallet.getSessionInfo();
+        if (sessionInfo && sessionInfo.session) {
+          const storage = new StorageService();
+          const nodeUrl = await storage.getNodeUrl();
+          const api = new NexusAPI(nodeUrl);
+          await api.terminateSession(sessionInfo.session);
+          await storage.clearSession();
+          console.log('Nexus session terminated on browser close');
+        }
+      } catch (error) {
+        console.error('Failed to terminate session on browser close:', error);
       }
     }
   }

@@ -19,11 +19,15 @@ class WalletService {
 
     // Check for existing session
     const savedSession = await this.storage.getSession();
+    console.log('Initialize: Retrieved saved session:', savedSession);
     if (savedSession) {
       this.session = savedSession.session;
       this.genesis = savedSession.genesis;
       this.username = savedSession.username;
       this.isLocked = savedSession.isLocked || false;
+      console.log('Initialize: Session loaded - session:', this.session, 'genesis:', this.genesis);
+    } else {
+      console.log('Initialize: No saved session found');
     }
 
     return this.isLoggedIn();
@@ -32,6 +36,19 @@ class WalletService {
   // Check if user is logged in
   isLoggedIn() {
     return this.session !== null;
+  }
+
+  // Get session information
+  getSessionInfo() {
+    if (!this.isLoggedIn()) {
+      return null;
+    }
+    return {
+      session: this.session,
+      genesis: this.genesis,
+      username: this.username,
+      isLocked: this.isLocked
+    };
   }
 
   // Create a new wallet (register profile)
@@ -194,6 +211,20 @@ class WalletService {
       return balances;
     } catch (error) {
       console.error('Failed to get all balances:', error);
+      throw error;
+    }
+  }
+
+  // List all accounts (each token has its own account with unique address)
+  async listAccounts() {
+    try {
+      console.log('listAccounts: Using session:', this.session);
+      const accounts = await this.api.listAccounts(this.session);
+      console.log('listAccounts: Got accounts:', accounts);
+      return accounts;
+    } catch (error) {
+      console.error('Failed to list accounts:', error);
+      console.error('Session value:', this.session);
       throw error;
     }
   }

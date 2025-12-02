@@ -12,7 +12,7 @@
     <div id="login-screen" class="screen">
       <div class="header">
         <h1>Distordia Q-wallet</h1>
-        <p class="tagline">Secure. Decentralized. Connected.</p>
+        <p class="tagline">Quantum resistance. Powered by Nexus.io.</p>
       </div>
       
       <div class="content">
@@ -149,9 +149,15 @@
     <div id="send-screen" class="screen hidden">
       <div class="header">
         <button id="back-from-send-btn" class="back-btn">← Back</button>
-        <h2>Send NXS</h2>
+        <h2>Send Tokens</h2>
       </div>
       <div class="content">
+        <div class="form-group">
+          <label for="send-from-account">From Account</label>
+          <select id="send-from-account" class="api-select">
+            <option value="">Select account...</option>
+          </select>
+        </div>
         <div class="form-group">
           <label for="send-to">Recipient Address or Username</label>
           <input type="text" id="send-to" placeholder="Enter address or username">
@@ -159,10 +165,10 @@
         <div class="form-group">
           <label for="send-amount">Amount</label>
           <div class="amount-input">
-            <input type="number" id="send-amount" placeholder="0.00" step="0.01" min="0">
-            <span class="currency">NXS</span>
+            <input type="number" id="send-amount" placeholder="0.00" step="0.000001" min="0">
+            <span class="currency" id="send-currency">NXS</span>
           </div>
-          <div class="balance-info">Available: <span id="send-available">0.00</span> NXS</div>
+          <div class="balance-info">Available: <span id="send-available">0.00</span> <span id="send-available-ticker">NXS</span></div>
         </div>
         <div class="form-group">
           <label for="send-reference">Reference (Optional)</label>

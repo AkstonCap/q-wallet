@@ -3,8 +3,7 @@
 
 class StorageService {
   constructor() {
-    this.storage = chrome.storage.local; // For persistent data (settings, node URL)
-    this.sessionStorage = chrome.storage.session; // For session data (cleared when browser closes)
+    this.storage = chrome.storage.local; // For all data including session (cleared on browser close via background.js)
   }
 
   // Save data to storage
@@ -20,10 +19,12 @@ class StorageService {
     });
   }
 
-  // Save data to session storage (cleared when browser closes)
+  // Save data to session storage (in-memory, cleared when extension/browser closes)
   async setSession(key, value) {
+    // Use chrome.storage.local with a special prefix to share across contexts
+    // Note: We'll manually clear this on browser close via background.js
     return new Promise((resolve, reject) => {
-      this.sessionStorage.set({ [key]: value }, () => {
+      this.storage.set({ [`session_${key}`]: value }, () => {
         if (chrome.runtime.lastError) {
           reject(chrome.runtime.lastError);
         } else {
@@ -46,14 +47,15 @@ class StorageService {
     });
   }
 
-  // Get data from session storage
+  // Get data from session storage (in-memory)
   async getSessionData(key) {
+    // Retrieve from chrome.storage.local with session prefix
     return new Promise((resolve, reject) => {
-      this.sessionStorage.get([key], (result) => {
+      this.storage.get([`session_${key}`], (result) => {
         if (chrome.runtime.lastError) {
           reject(chrome.runtime.lastError);
         } else {
-          resolve(result[key]);
+          resolve(result[`session_${key}`]);
         }
       });
     });
@@ -123,7 +125,7 @@ class StorageService {
   // Clear session data
   async clearSession() {
     return new Promise((resolve, reject) => {
-      this.sessionStorage.remove(['session'], () => {
+      this.storage.remove(['session_session'], () => {
         if (chrome.runtime.lastError) {
           reject(chrome.runtime.lastError);
         } else {

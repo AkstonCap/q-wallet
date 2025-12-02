@@ -46,9 +46,9 @@ function setupEventListeners() {
   });
 
   // Wallet screen
-  document.getElementById('send-btn').addEventListener('click', () => {
+  document.getElementById('send-btn').addEventListener('click', async () => {
     showScreen('send');
-    updateSendAvailable();
+    await populateSendAccounts();
   });
   document.getElementById('receive-btn').addEventListener('click', () => {
     showScreen('receive');
@@ -71,6 +71,7 @@ function setupEventListeners() {
   document.getElementById('back-from-send-btn').addEventListener('click', () => showScreen('wallet'));
   document.getElementById('confirm-send-btn').addEventListener('click', handleSend);
   document.getElementById('send-amount').addEventListener('input', updateTransactionSummary);
+  document.getElementById('send-from-account').addEventListener('change', handleAccountChange);
 
   // Receive screen
   document.getElementById('back-from-receive-btn').addEventListener('click', () => showScreen('wallet'));
@@ -180,19 +181,22 @@ async function handleLogin() {
     const apiUrl = getLoginApiUrl();
     await wallet.updateNodeUrl(apiUrl);
     
+    // Create and save session (locked)
     await wallet.login(username, password, pin);
+    
+    // Move to wallet UI immediately
     showScreen('wallet');
-    await loadWalletData();
     hideLoading();
     showNotification('Login successful!', 'success');
     
-    // Unlock session for notifications and transactions
+    // Unlock session and load data in background
     try {
       await wallet.unlock(pin);
-      showNotification('Session unlocked', 'success');
+      await loadWalletData();
     } catch (unlockError) {
-      showNotification('Warning: Session is locked. Some features may be unavailable.', 'warning');
-      console.error('Failed to unlock session:', unlockError);
+      console.error('Failed to unlock session or load data:', unlockError);
+      console.error('Error details:', unlockError.message);
+      showNotification('Warning: Failed to unlock session - ' + unlockError.message, 'warning');
     }
   } catch (error) {
     showNotification('Login failed: ' + error.message, 'error');
@@ -241,19 +245,21 @@ async function handleCreateWallet() {
     const apiUrl = getCreateApiUrl();
     await wallet.updateNodeUrl(apiUrl);
     
+    // Create wallet and save session (locked)
     await wallet.createWallet(username, password, pin);
+    
+    // Move to wallet UI immediately
     showScreen('wallet');
-    await loadWalletData();
     hideLoading();
     showNotification('Wallet created successfully!', 'success');
     
-    // Unlock session for notifications and transactions
+    // Unlock session and load data in background
     try {
       await wallet.unlock(pin);
-      showNotification('Session unlocked', 'success');
+      await loadWalletData();
     } catch (unlockError) {
-      showNotification('Warning: Session is locked. Some features may be unavailable.', 'warning');
-      console.error('Failed to unlock session:', unlockError);
+      console.error('Failed to unlock session or load data:', unlockError);
+      showNotification('Warning: Some features may be unavailable.', 'warning');
     }
   } catch (error) {
     showNotification('Failed to create wallet: ' + error.message, 'error');
@@ -269,16 +275,23 @@ async function loadWalletData() {
     // Update account info
     document.getElementById('account-name').textContent = walletInfo.username || 'Default Account';
     
-    // Get account address
-    const address = await wallet.getAccountAddress('default');
-    const truncatedAddress = truncateAddress(address);
-    document.getElementById('address-text').textContent = truncatedAddress;
-    document.getElementById('address-text').setAttribute('data-full-address', address);
+    // Get all accounts (each token has its own account with unique address)
+    const accounts = await wallet.listAccounts();
+    
+    // Find the default NXS account for main display
+    const defaultAccount = accounts.find(acc => acc.name === 'default' && (acc.token === '0' || acc.ticker === 'NXS'));
+    
+    if (defaultAccount) {
+      const truncatedAddress = truncateAddress(defaultAccount.address);
+      document.getElementById('address-text').textContent = truncatedAddress;
+      document.getElementById('address-text').setAttribute('data-full-address', defaultAccount.address);
+      
+      // Display NXS balance
+      document.getElementById('balance-amount').textContent = formatAmount(defaultAccount.balance);
+    }
 
-    // Get balance
-    const balance = await wallet.getBalance('default');
-    document.getElementById('balance-amount').textContent = formatAmount(balance.balance);
-    document.getElementById('nxs-balance').textContent = formatAmount(balance.balance);
+    // Load tokens list with all accounts
+    loadTokensList(accounts);
 
     // Load transactions
     await loadTransactions();
@@ -310,6 +323,51 @@ async function loadTransactions() {
   }
 }
 
+// Load tokens list with balances
+function loadTokensList(accounts) {
+  const container = document.getElementById('tokens-list');
+  
+  if (!accounts || accounts.length === 0) {
+    container.innerHTML = '<div class="empty-state">No accounts found</div>';
+    return;
+  }
+
+  container.innerHTML = '';
+  
+  // Display each account (each account is for a specific token)
+  accounts.forEach(account => {
+    const item = document.createElement('div');
+    item.className = 'token-item';
+    
+    const tokenInfo = document.createElement('div');
+    tokenInfo.className = 'token-info';
+    
+    const tokenName = document.createElement('div');
+    tokenName.className = 'token-name';
+    tokenName.textContent = account.ticker || 'Unknown';
+    
+    const tokenDesc = document.createElement('div');
+    tokenDesc.className = 'token-desc';
+    if (account.ticker === 'NXS') {
+      tokenDesc.textContent = account.name || 'default';
+    } else {
+      // Show account name for non-NXS tokens
+      tokenDesc.textContent = account.name || truncateAddress(account.address);
+    }
+    
+    tokenInfo.appendChild(tokenName);
+    tokenInfo.appendChild(tokenDesc);
+    
+    const tokenBalance = document.createElement('div');
+    tokenBalance.className = 'token-balance';
+    tokenBalance.textContent = formatAmount(account.balance || 0);
+    
+    item.appendChild(tokenInfo);
+    item.appendChild(tokenBalance);
+    container.appendChild(item);
+  });
+}
+
 // Create transaction item element
 function createTransactionItem(tx) {
   const div = document.createElement('div');
@@ -337,9 +395,15 @@ function createTransactionItem(tx) {
 
 // Handle send transaction
 async function handleSend() {
+  const accountName = document.getElementById('send-from-account').value;
   const recipient = document.getElementById('send-to').value.trim();
   const amount = document.getElementById('send-amount').value;
   const reference = document.getElementById('send-reference').value.trim();
+
+  if (!accountName) {
+    showNotification('Please select an account to send from', 'error');
+    return;
+  }
 
   if (!recipient || !amount) {
     showNotification('Please enter recipient and amount', 'error');
@@ -354,7 +418,7 @@ async function handleSend() {
   showLoading('Sending transaction...');
 
   try {
-    await wallet.send('default', amount, recipient, reference);
+    await wallet.send(accountName, amount, recipient, reference);
     showNotification('Transaction sent successfully!', 'success');
     
     // Clear form
@@ -373,24 +437,79 @@ async function handleSend() {
 }
 
 // Update send available balance
-async function updateSendAvailable() {
+// Populate send accounts dropdown
+async function populateSendAccounts() {
   try {
-    const balance = await wallet.getBalance('default');
-    document.getElementById('send-available').textContent = formatAmount(balance.balance);
+    const accounts = await wallet.listAccounts();
+    const select = document.getElementById('send-from-account');
+    
+    // Clear existing options except the first one
+    select.innerHTML = '<option value="">Select account...</option>';
+    
+    // Add each account as an option
+    accounts.forEach(account => {
+      const option = document.createElement('option');
+      option.value = account.name;
+      option.textContent = `${account.ticker || 'Unknown'} - ${account.name} (${formatAmount(account.balance || 0)})`;
+      option.dataset.balance = account.balance || 0;
+      option.dataset.ticker = account.ticker || 'Unknown';
+      option.dataset.decimals = account.decimals || 6;
+      select.appendChild(option);
+    });
+    
+    // Select default account if available
+    const defaultOption = Array.from(select.options).find(opt => opt.value === 'default');
+    if (defaultOption) {
+      select.value = 'default';
+      handleAccountChange();
+    }
   } catch (error) {
-    console.error('Failed to update available balance:', error);
+    console.error('Failed to populate accounts:', error);
+    showNotification('Failed to load accounts', 'error');
   }
+}
+
+// Handle account selection change
+function handleAccountChange() {
+  const select = document.getElementById('send-from-account');
+  const selectedOption = select.options[select.selectedIndex];
+  
+  if (!selectedOption || !selectedOption.value) {
+    return;
+  }
+  
+  const balance = parseFloat(selectedOption.dataset.balance) || 0;
+  const ticker = selectedOption.dataset.ticker || 'NXS';
+  const decimals = parseInt(selectedOption.dataset.decimals) || 6;
+  
+  // Update available balance display
+  document.getElementById('send-available').textContent = formatAmount(balance);
+  document.getElementById('send-available-ticker').textContent = ticker;
+  document.getElementById('send-currency').textContent = ticker;
+  
+  // Update amount input step based on decimals
+  const step = 1 / Math.pow(10, decimals);
+  document.getElementById('send-amount').step = step.toString();
+  
+  // Update transaction summary
+  updateTransactionSummary();
 }
 
 // Update transaction summary
 function updateTransactionSummary() {
   const amount = parseFloat(document.getElementById('send-amount').value) || 0;
-  const fee = 0.01; // Estimated fee
-  const total = amount + fee;
+  const ticker = document.getElementById('send-currency').textContent;
+  const fee = 0.01; // Estimated fee in NXS
+  const total = ticker === 'NXS' ? amount + fee : amount;
 
-  document.getElementById('summary-amount').textContent = formatAmount(amount) + ' NXS';
+  document.getElementById('summary-amount').textContent = formatAmount(amount) + ' ' + ticker;
   document.getElementById('summary-fee').textContent = '~' + formatAmount(fee) + ' NXS';
-  document.getElementById('summary-total').textContent = formatAmount(total) + ' NXS';
+  
+  if (ticker === 'NXS') {
+    document.getElementById('summary-total').textContent = formatAmount(total) + ' NXS';
+  } else {
+    document.getElementById('summary-total').textContent = formatAmount(amount) + ' ' + ticker + ' + ~' + formatAmount(fee) + ' NXS fee';
+  }
 }
 
 // Show receive address

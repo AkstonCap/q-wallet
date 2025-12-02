@@ -72,8 +72,8 @@ class NexusAPI {
     return this.request('sessions/lock/local', {
       pin,
       session,
-      notifications: false,
-      transactions: false
+      notifications: true,
+      transactions: true
     });
   }
 
@@ -147,11 +147,13 @@ class NexusAPI {
   }
 
   // Get transaction history
-  async getTransactions(name = 'default', session, limit = 100) {
+  async getTransactions(session, limit = 20, name = 'default') {
     return this.request('finance/transactions/account', {
       name,
       session,
-      limit
+      limit,
+      sort: 'timestamp',
+      order: 'desc'
     });
   }
 

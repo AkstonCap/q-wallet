@@ -5,6 +5,7 @@
 importScripts('services/nexus-api.js', 'services/storage.js', 'services/wallet.js');
 
 let wallet;
+const pendingApprovals = new Map(); // Store pending connection approval requests
 
 // Initialize on install
 chrome.runtime.onInstalled.addListener(async () => {
@@ -22,6 +23,36 @@ chrome.runtime.onStartup.addListener(async () => {
 
 // Handle messages from popup and content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // Handle connection approval responses
+  if (request.type === 'CONNECTION_RESPONSE') {
+    const { requestId, approved, blocked, origin } = request;
+    console.log('Connection response received:', { requestId, approved, blocked, origin });
+    
+    const pending = pendingApprovals.get(requestId);
+    if (pending) {
+      // Handle blocking if requested
+      if (blocked) {
+        const storage = new StorageService();
+        storage.addBlockedDomain(origin).then(() => {
+          console.log('Domain blocked:', origin);
+        });
+      }
+      
+      // Resolve the promise
+      pending.resolve(approved);
+      pendingApprovals.delete(requestId);
+      
+      // Close the window
+      if (pending.windowId) {
+        chrome.windows.remove(pending.windowId).catch(() => {});
+      }
+    }
+    
+    sendResponse({ success: true });
+    return true;
+  }
+  
+  // Handle normal messages
   handleMessage(request, sender)
     .then(sendResponse)
     .catch(error => {
@@ -101,6 +132,7 @@ async function handleMessage(request, sender) {
       return await handleDAppConnection(sender, params);
     
     case 'dapp.getAccounts':
+      await checkDAppPermission(params.origin);
       if (!wallet.isLoggedIn()) {
         throw new Error('Wallet not connected');
       }
@@ -108,9 +140,11 @@ async function handleMessage(request, sender) {
       return { result: [address] };
     
     case 'dapp.signTransaction':
+      await checkDAppPermission(params.origin);
       return await handleSignTransaction(params);
     
     case 'dapp.sendTransaction':
+      await checkDAppPermission(params.origin);
       if (!wallet.isLoggedIn()) {
         throw new Error('Wallet not connected');
       }
@@ -121,32 +155,158 @@ async function handleMessage(request, sender) {
   }
 }
 
+// Check if dApp has permission
+async function checkDAppPermission(origin) {
+  const storage = new StorageService();
+  
+  // Check if blocked
+  const isBlocked = await storage.isDomainBlocked(origin);
+  if (isBlocked) {
+    throw new Error('This domain has been blocked from accessing your wallet');
+  }
+  
+  // Check if approved
+  const isApproved = await storage.isDomainApproved(origin);
+  if (!isApproved) {
+    throw new Error('This domain is not approved. Please connect first.');
+  }
+}
+
 // Handle DApp connection request
 async function handleDAppConnection(sender, params) {
   const { origin } = params;
   
-  // In a production environment, you would show a popup for user approval
-  // For now, we'll auto-approve if logged in
   if (!wallet.isLoggedIn()) {
-    throw new Error('Wallet not connected');
+    throw new Error('Wallet not connected. Please log in first.');
   }
 
-  // Store approved domain
   const storage = new StorageService();
-  const approvedDomains = await storage.get('approvedDomains') || [];
-  if (!approvedDomains.includes(origin)) {
-    approvedDomains.push(origin);
-    await storage.set('approvedDomains', approvedDomains);
+  
+  // Check if domain is blocked
+  const isBlocked = await storage.isDomainBlocked(origin);
+  if (isBlocked) {
+    throw new Error('This domain has been blocked from connecting to your wallet');
   }
 
-  const address = await wallet.getAccountAddress('default');
-  return {
-    result: {
-      connected: true,
-      accounts: [address]
-    }
-  };
+  // Check if already approved
+  const isApproved = await storage.isDomainApproved(origin);
+  if (isApproved) {
+    const address = await wallet.getAccountAddress('default');
+    return {
+      result: {
+        connected: true,
+        accounts: [address]
+      }
+    };
+  }
+
+  // Request user approval via notification
+  const approved = await requestUserApproval(origin);
+  
+  if (approved) {
+    await storage.addApprovedDomain(origin);
+    const address = await wallet.getAccountAddress('default');
+    return {
+      result: {
+        connected: true,
+        accounts: [address]
+      }
+    };
+  } else {
+    throw new Error('User denied connection request');
+  }
 }
+
+// Request user approval for dApp connection
+async function requestUserApproval(origin) {
+  return new Promise((resolve, reject) => {
+    const requestId = Date.now().toString();
+    console.log('Requesting approval for:', origin, 'requestId:', requestId);
+    
+    // Store the pending request
+    pendingApprovals.set(requestId, { origin, resolve, reject });
+    
+    // Create popup window for approval (centered on current screen)
+    const width = 400;
+    const height = 420;
+    
+    chrome.windows.create({
+      url: `approve-connection.html?origin=${encodeURIComponent(origin)}&requestId=${requestId}`,
+      type: 'popup',
+      width: width,
+      height: height,
+      focused: true
+    }, (window) => {
+      if (chrome.runtime.lastError) {
+        console.error('Failed to create approval window:', chrome.runtime.lastError);
+        pendingApprovals.delete(requestId);
+        reject(new Error('Unable to show approval dialog'));
+        return;
+      }
+      
+      console.log('Approval window created:', window.id);
+      
+      // Store window ID with the request
+      const pending = pendingApprovals.get(requestId);
+      if (pending) {
+        pending.windowId = window.id;
+      }
+      
+      // Add timeout - auto-deny after 2 minutes
+      setTimeout(() => {
+        if (pendingApprovals.has(requestId)) {
+          console.log('Approval request timed out for:', origin);
+          pendingApprovals.delete(requestId);
+          reject(new Error('Connection request timed out'));
+          
+          // Close the window if still open
+          chrome.windows.remove(window.id).catch(() => {});
+        }
+      }, 120000);
+    });
+  });
+}
+
+// Handle connection response from approval popup
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.type === 'CONNECTION_RESPONSE') {
+    const { requestId, approved, blocked, origin } = request;
+    console.log('Connection response received:', { requestId, approved, blocked, origin });
+    
+    const pending = pendingApprovals.get(requestId);
+    if (pending) {
+      // Handle blocking if requested
+      if (blocked) {
+        const storage = new StorageService();
+        storage.addBlockedDomain(origin).then(() => {
+          console.log('Domain blocked:', origin);
+        });
+      }
+      
+      // Resolve the promise
+      pending.resolve(approved);
+      pendingApprovals.delete(requestId);
+      
+      // Close the window
+      if (pending.windowId) {
+        chrome.windows.remove(pending.windowId).catch(() => {});
+      }
+    }
+    
+    sendResponse({ success: true });
+    return true;
+  }
+  
+  // Handle other messages
+  handleMessage(request, sender)
+    .then(sendResponse)
+    .catch(error => {
+      console.error('Message handler error:', error);
+      sendResponse({ error: error.message });
+    });
+  
+  return true;
+});
 
 // Handle transaction signing
 async function handleSignTransaction(params) {

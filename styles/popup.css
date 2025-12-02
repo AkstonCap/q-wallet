@@ -711,3 +711,53 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary);
 }
+
+/* Connected Sites */
+.settings-description {
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+.connected-sites-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.connected-site-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.connected-site-info {
+  flex: 1;
+  overflow: hidden;
+}
+
+.connected-site-domain {
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connected-site-status {
+  font-size: 11px;
+  color: var(--success-color);
+  margin-top: 4px;
+}
+
+.connected-site-item .btn-danger {
+  padding: 6px 12px;
+  font-size: 12px;
+  margin-left: 12px;
+}
+

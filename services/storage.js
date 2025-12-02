@@ -180,6 +180,57 @@ class StorageService {
       createdAt: Date.now()
     });
   }
+
+  // ===== DApp Connection Management =====
+
+  // Get list of approved domains
+  async getApprovedDomains() {
+    return await this.get('approvedDomains') || [];
+  }
+
+  // Add approved domain
+  async addApprovedDomain(domain) {
+    const approved = await this.getApprovedDomains();
+    if (!approved.includes(domain)) {
+      approved.push(domain);
+      await this.set('approvedDomains', approved);
+    }
+  }
+
+  // Remove approved domain
+  async removeApprovedDomain(domain) {
+    const approved = await this.getApprovedDomains();
+    const filtered = approved.filter(d => d !== domain);
+    await this.set('approvedDomains', filtered);
+  }
+
+  // Check if domain is approved
+  async isDomainApproved(domain) {
+    const approved = await this.getApprovedDomains();
+    return approved.includes(domain);
+  }
+
+  // Get list of blocked domains
+  async getBlockedDomains() {
+    return await this.get('blockedDomains') || [];
+  }
+
+  // Add blocked domain
+  async addBlockedDomain(domain) {
+    const blocked = await this.getBlockedDomains();
+    if (!blocked.includes(domain)) {
+      blocked.push(domain);
+      await this.set('blockedDomains', blocked);
+    }
+    // Also remove from approved if present
+    await this.removeApprovedDomain(domain);
+  }
+
+  // Check if domain is blocked
+  async isDomainBlocked(domain) {
+    const blocked = await this.getBlockedDomains();
+    return blocked.includes(domain);
+  }
 }
 
 // Export for use in other modules

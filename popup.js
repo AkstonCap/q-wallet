@@ -657,6 +657,58 @@ async function loadSettings() {
   document.getElementById('settings-username').textContent = walletInfo.username || '-';
   document.getElementById('settings-genesis').textContent = walletInfo.genesis || '-';
   document.getElementById('node-url').value = nodeUrl;
+  
+  // Load connected sites
+  await loadConnectedSites();
+}
+
+// Load connected sites list
+async function loadConnectedSites() {
+  const storage = new StorageService();
+  const approvedDomains = await storage.getApprovedDomains();
+  const container = document.getElementById('connected-sites-list');
+  
+  if (!approvedDomains || approvedDomains.length === 0) {
+    container.innerHTML = '<div class="empty-state">No sites connected</div>';
+    return;
+  }
+  
+  container.innerHTML = '';
+  
+  approvedDomains.forEach(domain => {
+    const item = document.createElement('div');
+    item.className = 'connected-site-item';
+    
+    item.innerHTML = `
+      <div class="connected-site-info">
+        <div class="connected-site-domain">${domain}</div>
+        <div class="connected-site-status">✓ Connected</div>
+      </div>
+      <button class="btn btn-danger revoke-btn" data-domain="${domain}">Revoke</button>
+    `;
+    
+    // Add revoke button handler
+    item.querySelector('.revoke-btn').addEventListener('click', () => handleRevokeConnection(domain));
+    
+    container.appendChild(item);
+  });
+}
+
+// Handle revoke connection
+async function handleRevokeConnection(domain) {
+  if (!confirm(`Are you sure you want to revoke access for ${domain}?`)) {
+    return;
+  }
+  
+  try {
+    const storage = new StorageService();
+    await storage.removeApprovedDomain(domain);
+    showNotification('Connection revoked successfully', 'success');
+    await loadConnectedSites();
+  } catch (error) {
+    console.error('Failed to revoke connection:', error);
+    showNotification('Failed to revoke connection', 'error');
+  }
 }
 
 // Handle save node URL

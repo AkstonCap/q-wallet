@@ -25,6 +25,11 @@
       const { id, method, params } = event.data;
 
       try {
+        // Check if extension context is valid
+        if (!chrome.runtime?.id) {
+          throw new Error('Extension context invalidated. Please refresh the page.');
+        }
+
         // Forward to background script
         const response = await chrome.runtime.sendMessage({
           method,
@@ -42,10 +47,17 @@
           error: response.error
         }, '*');
       } catch (error) {
+        // Handle extension context invalidation
+        let errorMessage = error.message;
+        if (error.message.includes('Extension context invalidated') || 
+            error.message.includes('message port closed')) {
+          errorMessage = 'Extension was reloaded. Please refresh this page.';
+        }
+        
         window.postMessage({
           type: 'NEXUS_PROVIDER_RESPONSE',
           id,
-          error: error.message
+          error: errorMessage
         }, '*');
       }
     }

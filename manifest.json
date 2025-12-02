@@ -8,7 +8,8 @@
     "unlimitedStorage",
     "activeTab",
     "scripting",
-    "management"
+    "management",
+    "notifications"
   ],
   "host_permissions": [
     "http://localhost:8080/*",

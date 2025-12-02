@@ -117,7 +117,13 @@
     </div>
 
     <div class="warning">
-      ⚠️ <strong>Note:</strong> Make sure the Nexus Wallet extension is installed and you're logged in.
+      ⚠️ <strong>Security Features:</strong>
+      <ul style="margin: 10px 0 0 20px;">
+        <li>First connection requires explicit approval via notification</li>
+        <li>Only approved sites can access wallet functions</li>
+        <li>Manage connected sites in Settings → Connected Sites</li>
+        <li>Revoke access anytime from the wallet settings</li>
+      </ul>
     </div>
 
     <!-- Connection Section -->
@@ -125,6 +131,7 @@
       <h3>1. Connect Wallet</h3>
       <button id="connect-btn" onclick="connectWallet()">Connect Wallet</button>
       <button id="check-btn" onclick="checkConnection()">Check Connection</button>
+      <button id="disconnect-btn" onclick="disconnectWallet()" style="display: none; background: #dc3545;">Disconnect Wallet</button>
       
       <div id="account-info" style="display: none;">
         <div class="label">Connected Account:</div>
@@ -220,6 +227,10 @@ if (typeof window.nexus !== 'undefined') {
           document.getElementById('account-address').textContent = connectedAccount;
           document.getElementById('account-info').style.display = 'block';
           
+          // Show disconnect button, hide connect button
+          document.getElementById('connect-btn').style.display = 'none';
+          document.getElementById('disconnect-btn').style.display = 'inline-block';
+          
           // Enable buttons
           document.getElementById('balance-btn').disabled = false;
           document.getElementById('send-btn').disabled = false;
@@ -231,6 +242,29 @@ if (typeof window.nexus !== 'undefined') {
         console.error('Connection failed:', error);
         updateStatus('Connection failed: ' + error.message, 'error');
       }
+    }
+
+    // Disconnect wallet
+    function disconnectWallet() {
+      connectedAccount = null;
+      
+      // Update UI
+      updateStatus('Wallet disconnected. Note: To fully revoke access, go to wallet Settings → Connected Sites', '');
+      document.getElementById('account-info').style.display = 'none';
+      document.getElementById('balance-info').style.display = 'none';
+      document.getElementById('tx-info').style.display = 'none';
+      document.getElementById('history-info').style.display = 'none';
+      
+      // Show connect button, hide disconnect button
+      document.getElementById('connect-btn').style.display = 'inline-block';
+      document.getElementById('disconnect-btn').style.display = 'none';
+      
+      // Disable buttons
+      document.getElementById('balance-btn').disabled = true;
+      document.getElementById('send-btn').disabled = true;
+      document.getElementById('history-btn').disabled = true;
+      
+      alert('Disconnected! To fully revoke this site\'s access, go to your wallet and navigate to Settings → Connected Sites → Revoke');
     }
 
     // Check connection status
@@ -246,12 +280,20 @@ if (typeof window.nexus !== 'undefined') {
           document.getElementById('account-address').textContent = connectedAccount;
           document.getElementById('account-info').style.display = 'block';
           
+          // Show disconnect button, hide connect button
+          document.getElementById('connect-btn').style.display = 'none';
+          document.getElementById('disconnect-btn').style.display = 'inline-block';
+          
           // Enable buttons
           document.getElementById('balance-btn').disabled = false;
           document.getElementById('send-btn').disabled = false;
           document.getElementById('history-btn').disabled = false;
         } else {
           updateStatus('Wallet not connected. Click "Connect Wallet" button.', '');
+          
+          // Show connect button, hide disconnect button
+          document.getElementById('connect-btn').style.display = 'inline-block';
+          document.getElementById('disconnect-btn').style.display = 'none';
         }
       } catch (error) {
         console.error('Check failed:', error);

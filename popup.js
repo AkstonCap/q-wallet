@@ -90,7 +90,8 @@ function setupEventListeners() {
   // Settings screen
   document.getElementById('back-from-settings-btn').addEventListener('click', () => showScreen('wallet'));
   document.getElementById('save-node-btn').addEventListener('click', handleSaveNode);
-  document.getElementById('lock-wallet-btn').addEventListener('click', handleLockWallet);
+  // Lock wallet button is commented out in HTML
+  // document.getElementById('lock-wallet-btn').addEventListener('click', handleLockWallet);
   document.getElementById('logout-btn').addEventListener('click', handleLogout);
 }
 
@@ -892,12 +893,18 @@ async function handleLockWallet() {
 
 // Handle logout
 async function handleLogout() {
+  console.log('Logout button clicked');
+  
   if (!confirm('Are you sure you want to logout?')) {
+    console.log('Logout cancelled by user');
     return;
   }
 
+  console.log('Attempting logout...');
+  
   try {
     await wallet.logout();
+    console.log('Logout successful, switching to login screen');
     showScreen('login');
     
     // Clear form fields
@@ -907,7 +914,8 @@ async function handleLogout() {
     
     showNotification('Logged out successfully', 'success');
   } catch (error) {
-    showNotification('Failed to logout', 'error');
+    console.error('Logout error:', error);
+    showNotification('Failed to logout: ' + error.message, 'error');
   }
 }
 

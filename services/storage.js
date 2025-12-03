@@ -3,7 +3,17 @@
 
 class StorageService {
   constructor() {
-    this.storage = chrome.storage.local; // For all data including session (cleared on browser close via background.js)
+    this.storage = chrome.storage.local; // For persistent data
+    // Use chrome.storage.session for session tokens (auto-cleared on browser close)
+    // Falls back to chrome.storage.local with manual cleanup if session storage unavailable
+    this.sessionStorage = chrome.storage.session || chrome.storage.local;
+    this.useSessionAPI = !!chrome.storage.session;
+    
+    if (this.useSessionAPI) {
+      console.log('Using chrome.storage.session for secure session storage');
+    } else {
+      console.warn('chrome.storage.session unavailable, using chrome.storage.local with manual cleanup');
+    }
   }
 
   // Save data to storage
@@ -19,12 +29,11 @@ class StorageService {
     });
   }
 
-  // Save data to session storage (in-memory, cleared when extension/browser closes)
+  // Save data to session storage (automatically cleared when browser closes)
   async setSession(key, value) {
-    // Use chrome.storage.local with a special prefix to share across contexts
-    // Note: We'll manually clear this on browser close via background.js
     return new Promise((resolve, reject) => {
-      this.storage.set({ [`session_${key}`]: value }, () => {
+      const storageKey = this.useSessionAPI ? key : `session_${key}`;
+      this.sessionStorage.set({ [storageKey]: value }, () => {
         if (chrome.runtime.lastError) {
           reject(chrome.runtime.lastError);
         } else {
@@ -47,15 +56,15 @@ class StorageService {
     });
   }
 
-  // Get data from session storage (in-memory)
+  // Get data from session storage
   async getSessionData(key) {
-    // Retrieve from chrome.storage.local with session prefix
     return new Promise((resolve, reject) => {
-      this.storage.get([`session_${key}`], (result) => {
+      const storageKey = this.useSessionAPI ? key : `session_${key}`;
+      this.sessionStorage.get([storageKey], (result) => {
         if (chrome.runtime.lastError) {
           reject(chrome.runtime.lastError);
         } else {
-          resolve(result[`session_${key}`]);
+          resolve(result[storageKey]);
         }
       });
     });
@@ -122,15 +131,60 @@ class StorageService {
     return await this.getSessionData('session');
   }
 
-  // Clear session data
+  // Clear session data (secure deletion - overwrite then remove)
   async clearSession() {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const storageKey = this.useSessionAPI ? 'session' : 'session_session';
+        
+        // SECURITY: Overwrite session data with null before removal (secure deletion)
+        await this.setSession('session', null);
+        
+        // Remove the key
+        this.sessionStorage.remove([storageKey], () => {
+          if (chrome.runtime.lastError) {
+            console.warn('Error clearing session:', chrome.runtime.lastError);
+            // Don't reject - session may already be cleared
+            resolve();
+          } else {
+            console.log('Session data securely cleared');
+            resolve();
+          }
+        });
+      } catch (error) {
+        console.error('Error in clearSession:', error);
+        resolve(); // Resolve anyway to allow logout to continue
+      }
+    });
+  }
+  
+  // Clear all session-prefixed data (for fallback mode cleanup)
+  async clearAllSessionData() {
     return new Promise((resolve, reject) => {
-      this.storage.remove(['session_session'], () => {
+      this.storage.get(null, (items) => {
         if (chrome.runtime.lastError) {
           reject(chrome.runtime.lastError);
-        } else {
-          resolve();
+          return;
         }
+        
+        // Find all keys with session_ prefix
+        const sessionKeys = Object.keys(items).filter(key => key.startsWith('session_'));
+        
+        if (sessionKeys.length === 0) {
+          resolve();
+          return;
+        }
+        
+        // Remove all session keys
+        this.storage.remove(sessionKeys, () => {
+          if (chrome.runtime.lastError) {
+            console.warn('Error clearing all session data:', chrome.runtime.lastError);
+            resolve(); // Don't fail on cleanup errors
+          } else {
+            console.log(`Cleared ${sessionKeys.length} session data keys`);
+            resolve();
+          }
+        });
       });
     });
   }

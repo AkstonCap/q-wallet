@@ -159,121 +159,58 @@ if (typeof window.nexus !== 'undefined') {
 - `nexus.getTransactionHistory(limit)` - Get transaction history
 - `nexus.isWalletConnected()` - Check connection status
 
-### Events
+For complete dApp integration documentation, see [DAPP-INTEGRATION.md](DAPP-INTEGRATION.md).
 
-```javascript
-// Listen for account changes
-window.nexus.on('accountsChanged', (accounts) => {
-  console.log('Account changed:', accounts[0]);
-});
+## Security Features
 
-// Listen for connection
-window.nexus.on('connect', (info) => {
-  console.log('Wallet connected:', info);
-});
-```
-
-## Architecture
-
-```
-qwallet/
-├── manifest.json           # Extension manifest (v3)
-├── popup.html             # Main wallet UI
-├── popup.js               # UI controller
-├── background.js          # Background service worker
-├── content.js             # Content script (message relay)
-├── inpage.js              # Injected provider (window.nexus)
-├── styles/
-│   └── popup.css          # Wallet styling
-├── services/
-│   ├── nexus-api.js       # Nexus blockchain API client
-│   ├── storage.js         # Chrome storage wrapper
-│   └── wallet.js          # Wallet business logic
-└── icons/
-    ├── icon16.png
-    ├── icon32.png
-    ├── icon48.png
-    └── icon128.png
-```
-
-## API Reference
-
-### Nexus API Endpoints Used
-
-The wallet interacts with the following Nexus API endpoints:
-
-**Sessions**
-- `sessions/create/local` - Create login session
-- `sessions/terminate/local` - Logout
-- `sessions/unlock/local` - Unlock with PIN
-- `sessions/lock/local` - Lock session
-
-**Profiles**
-- `profiles/create/master` - Create new profile
-- `profiles/get/master` - Get profile info
-
-**Finance**
-- `finance/get/account` - Get account details
-- `finance/list/accounts` - List all accounts
-- `finance/get/balances` - Get all balances
-- `finance/create/account` - Create new account
-- `finance/debit/account` - Send transaction
-- `finance/transactions/account` - Get transaction history
-
-**Ledger**
-- `ledger/get/transaction` - Get transaction details
-- `ledger/get/info` - Get blockchain info
-
-## Security Considerations
-
-### What's Stored
-- Session tokens (encrypted by Chrome)
-- Wallet configuration
-- Transaction cache
-- Node URL preference
-
-### What's NOT Stored
-- Private keys (managed by Nexus node)
-- Plain-text passwords
-- Plain-text PINs
+### Data Protection
+- 🔒 **No Credential Storage** - Your username, password, and PIN are never stored in the extension
+- 🔐 **Session-Based Security** - Session tokens auto-clear when you close your browser
+- 🔑 **PIN Confirmation** - All transactions require PIN re-entry for approval
+- 🌐 **HTTPS Enforcement** - Remote connections must use secure HTTPS protocol
 
 ### Best Practices
-1. Use strong, unique passwords
-2. Never share your password or PIN
-3. Only connect to trusted nodes
-4. Review all transactions before confirming
-5. Lock your wallet when not in use
-6. Only approve dApp connections you trust
+1. ✅ Use strong, unique passwords (minimum 8 characters)
+2. ✅ Never share your password or PIN with anyone
+3. ✅ Only connect to trusted Nexus nodes
+4. ✅ Review all transactions carefully before confirming
+5. ✅ Lock your wallet when not in use
+6. ✅ Only approve dApp connections from websites you trust
+7. ✅ Keep your credentials backed up safely offline
 
-## Development
+### What's Stored
+- ✅ Session tokens (temporarily, auto-cleared on browser close)
+- ✅ Wallet preferences and settings
+- ✅ Node URL configuration
+- ✅ Transaction cache for quick display
 
-### Project Structure
+### What's NEVER Stored
+- ❌ Your username, password, or PIN
+- ❌ Private keys (managed by Nexus node)
+- ❌ Any sensitive credentials
 
-- **Manifest v3**: Uses the latest Chrome extension API
-- **Vanilla JavaScript**: No build tools or frameworks required
-- **Service Worker**: Background processing with `background.js`
-- **Content Scripts**: Secure message passing between page and extension
-- **Storage API**: Chrome's secure local storage
+## Frequently Asked Questions
 
-### Adding Features
+### How do I backup my wallet?
+Your wallet is created on the Nexus blockchain, not in the browser extension. Make sure to securely store your username, password, and PIN. You can access your wallet from any device with these credentials.
 
-1. **New API Endpoint**: Add method to `services/nexus-api.js`
-2. **New Wallet Feature**: Add to `services/wallet.js`
-3. **UI Component**: Update `popup.html` and `popup.js`
-4. **dApp Method**: Add to `inpage.js` provider
+### Can I use multiple accounts?
+Yes! The Nexus blockchain supports multiple accounts per profile. Create additional accounts in the wallet settings.
 
-### Testing
+### What if I forget my password or PIN?
+Unfortunately, these cannot be recovered. Always keep secure backups of your credentials.
 
-```bash
-# Test with local Nexus node
-./nexus -noapiauth
+### Is my wallet secure?
+Yes! Your credentials are never stored in the extension. Session tokens are temporary and auto-clear when you close your browser. All transactions require PIN confirmation.
 
-# Create test account
-./nexus profiles/create/master username=test password=test123 pin=1234
+### Can I use this with hardware wallets?
+Not currently, but this feature is planned for future releases.
 
-# Check account
-./nexus finance/get/balances session=<session-id>
-```
+### How do I connect to a remote Nexus node?
+Go to Settings → Node Settings, and enter your remote node URL. For security, only HTTPS connections are allowed for remote nodes (localhost/LAN can use HTTP).
+
+### What browsers are supported?
+Chrome, Brave, Edge, and other Chromium-based browsers are fully supported. Firefox is supported but the extension needs to be loaded as a temporary add-on.
 
 ## Troubleshooting
 
@@ -283,7 +220,7 @@ The wallet interacts with the following Nexus API endpoints:
 - Look for errors in `chrome://extensions` with Developer mode enabled
 
 ### Can't Connect to Node
-- Verify your Nexus node is running
+- Verify your Nexus node is running (try: `curl http://localhost:8080/system/get/info`)
 - Check the node URL in settings
 - Ensure CORS is enabled on your node (for remote connections)
 - Check firewall settings
@@ -291,61 +228,45 @@ The wallet interacts with the following Nexus API endpoints:
 ### Login Fails
 - Verify username, password, and PIN are correct
 - Ensure your Nexus node is accessible
-- Check that the profile exists (create if needed)
+- Check that the profile exists (create a new wallet if needed)
 
 ### Transactions Not Showing
-- Wait for blockchain confirmation
-- Refresh wallet (lock/unlock)
-- Check node connection
-- Verify transaction on blockchain explorer
+- Wait for blockchain confirmation (usually a few seconds)
+- Refresh wallet data by locking and unlocking
+- Check node connection in settings
+- Verify transaction on the blockchain
 
-## Contributing
+### Icons Not Showing
+The extension works perfectly without icons. If you want custom icons, open `generate-icons.html` in your browser and save the generated images to the `icons/` folder.
 
-Contributions are welcome! Please:
+## Future Plans
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## Roadmap
-
-- [ ] Multi-account support
-- [ ] Token management (custom tokens)
-- [ ] Hardware wallet integration
-- [ ] Address book
-- [ ] Transaction notes
-- [ ] Multi-language support
-- [ ] Dark mode
-- [ ] Mobile version
-- [ ] NFT support
-- [ ] Staking interface
-- [ ] DeFi integrations
+Planned features for future releases:
+- Multi-account UI improvements
+- Token management for custom tokens
+- Hardware wallet integration
+- Address book
+- Transaction export
+- Multi-language support
+- Dark mode theme
+- NFT support
+- Staking interface
+- DeFi integrations
 
 ## License
 
-MIT License - see LICENSE file for details
+MIT License - Use freely, modify, and distribute as needed.
 
-## Support
+## Important Disclaimer
 
-- **Documentation**: [Nexus API Docs](./Nexus%20api%20docs/)
-- **Issues**: Report bugs or request features via GitHub Issues
-- **Community**: Join the Nexus community forums
-
-## Credits
-
-Built for the Nexus.io blockchain ecosystem.
-
-## Disclaimer
-
-This is wallet software that manages cryptocurrency. Use at your own risk. Always:
-- Keep backups of your credentials
-- Use strong passwords
-- Verify all transactions
-- Only install from trusted sources
-- Keep your software updated
+This wallet manages cryptocurrency. Use at your own risk. Always:
+- ✅ Keep secure backups of your credentials
+- ✅ Use strong, unique passwords
+- ✅ Verify all transactions before confirming
+- ✅ Only install from trusted sources
+- ✅ Never share your password or PIN
 
 ---
 
-**Made with ❤️ for the Nexus Community**
+**Built with ❤️ for the Nexus Blockchain Community**
+

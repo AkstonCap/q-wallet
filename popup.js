@@ -73,6 +73,15 @@ function setupEventListeners() {
   document.getElementById('send-amount').addEventListener('input', updateTransactionSummary);
   document.getElementById('send-from-account').addEventListener('change', handleAccountChange);
 
+  // PIN confirmation modal
+  document.getElementById('cancel-transaction-btn').addEventListener('click', closePinModal);
+  document.getElementById('confirm-transaction-btn').addEventListener('click', handleConfirmTransaction);
+  document.getElementById('confirm-pin').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      handleConfirmTransaction();
+    }
+  });
+
   // Receive screen
   document.getElementById('back-from-receive-btn').addEventListener('click', () => showScreen('wallet'));
   document.getElementById('copy-address-btn').addEventListener('click', copyReceiveAddress);
@@ -138,6 +147,39 @@ function handleCreateApiChange() {
   }
 }
 
+// Validate node URL for security (HTTPS enforcement)
+function validateNodeUrl(url) {
+  try {
+    const urlObj = new URL(url);
+    
+    // Check if it's a remote connection (not localhost or local network)
+    const isRemote = urlObj.hostname !== 'localhost' &&
+                     urlObj.hostname !== '127.0.0.1' &&
+                     !urlObj.hostname.startsWith('192.168.') &&
+                     !urlObj.hostname.startsWith('10.') &&
+                     !urlObj.hostname.startsWith('172.16.');
+    
+    // SECURITY: Enforce HTTPS for remote connections
+    if (isRemote && urlObj.protocol === 'http:') {
+      const httpsUrl = url.replace('http://', 'https://');
+      const message = `⚠️ SECURITY WARNING\n\nHTTP connections to remote servers are not secure.\n\nYour credentials and transactions could be intercepted.\n\nWould you like to use HTTPS instead?\n\nHTTP: ${url}\nHTTPS: ${httpsUrl}`;
+      
+      if (confirm(message)) {
+        return httpsUrl;
+      } else {
+        throw new Error('HTTP is not allowed for remote connections. Please use HTTPS.');
+      }
+    }
+    
+    return url;
+  } catch (error) {
+    if (error.message.includes('HTTP is not allowed')) {
+      throw error;
+    }
+    throw new Error('Invalid URL format. Please enter a valid URL.');
+  }
+}
+
 // Get selected API URL from login form
 function getLoginApiUrl() {
   const select = document.getElementById('login-api-service');
@@ -146,7 +188,7 @@ function getLoginApiUrl() {
     if (!customUrl) {
       throw new Error('Please enter a custom API URL');
     }
-    return customUrl;
+    return validateNodeUrl(customUrl);
   }
   return select.value;
 }
@@ -159,7 +201,7 @@ function getCreateApiUrl() {
     if (!customUrl) {
       throw new Error('Please enter a custom API URL');
     }
-    return customUrl;
+    return validateNodeUrl(customUrl);
   }
   return select.value;
 }
@@ -185,6 +227,11 @@ async function handleLogin() {
     // Create and save session (locked)
     await wallet.login(username, password, pin);
     
+    // SECURITY: Clear sensitive data immediately after session creation
+    document.getElementById('login-username').value = '';
+    document.getElementById('login-password').value = '';
+    document.getElementById('login-pin').value = '';
+    
     // Move to wallet UI immediately
     showScreen('wallet');
     hideLoading();
@@ -202,6 +249,9 @@ async function handleLogin() {
   } catch (error) {
     showNotification('Login failed: ' + error.message, 'error');
     hideLoading();
+    // Clear password and PIN on error too
+    document.getElementById('login-password').value = '';
+    document.getElementById('login-pin').value = '';
   }
 }
 
@@ -249,6 +299,13 @@ async function handleCreateWallet() {
     // Create wallet and save session (locked)
     await wallet.createWallet(username, password, pin);
     
+    // SECURITY: Clear sensitive data immediately after wallet creation
+    document.getElementById('create-username').value = '';
+    document.getElementById('create-password').value = '';
+    document.getElementById('create-password-confirm').value = '';
+    document.getElementById('create-pin').value = '';
+    document.getElementById('create-pin-confirm').value = '';
+    
     // Move to wallet UI immediately
     showScreen('wallet');
     hideLoading();
@@ -265,6 +322,11 @@ async function handleCreateWallet() {
   } catch (error) {
     showNotification('Failed to create wallet: ' + error.message, 'error');
     hideLoading();
+    // Clear passwords and PINs on error too
+    document.getElementById('create-password').value = '';
+    document.getElementById('create-password-confirm').value = '';
+    document.getElementById('create-pin').value = '';
+    document.getElementById('create-pin-confirm').value = '';
   }
 }
 
@@ -435,10 +497,83 @@ async function handleSend() {
     return;
   }
 
+  // Show PIN confirmation modal with transaction details
+  showPinModal(accountName, recipient, amount, reference);
+}
+
+// Show PIN confirmation modal
+function showPinModal(fromAccount, toAddress, amount, reference) {
+  const select = document.getElementById('send-from-account');
+  const selectedOption = select.options[select.selectedIndex];
+  const ticker = selectedOption.dataset.ticker || 'Unknown';
+  
+  // Populate modal with transaction details
+  document.getElementById('modal-from-account').textContent = `${fromAccount} (${ticker})`;
+  document.getElementById('modal-to-address').textContent = toAddress;
+  document.getElementById('modal-to-address').title = toAddress; // Full address on hover
+  document.getElementById('modal-amount').textContent = `${formatAmount(amount)} ${ticker}`;
+  document.getElementById('modal-total').textContent = `${formatAmount(amount)} ${ticker}`;
+  
+  // Show/hide reference row
+  const referenceRow = document.getElementById('modal-reference-row');
+  if (reference) {
+    document.getElementById('modal-reference').textContent = reference;
+    referenceRow.style.display = 'flex';
+  } else {
+    referenceRow.style.display = 'none';
+  }
+  
+  // Clear PIN input
+  document.getElementById('confirm-pin').value = '';
+  
+  // Store transaction data for confirmation
+  window.pendingTransaction = {
+    fromAccount,
+    toAddress,
+    amount,
+    reference
+  };
+  
+  // Show modal
+  document.getElementById('pin-modal').classList.remove('hidden');
+  document.getElementById('confirm-pin').focus();
+}
+
+// Close PIN modal
+function closePinModal() {
+  document.getElementById('pin-modal').classList.add('hidden');
+  document.getElementById('confirm-pin').value = '';
+  window.pendingTransaction = null;
+}
+
+// Handle transaction confirmation with PIN
+async function handleConfirmTransaction() {
+  const pin = document.getElementById('confirm-pin').value;
+  
+  if (!pin || pin.length < 4) {
+    showNotification('Please enter a valid PIN (at least 4 digits)', 'error');
+    return;
+  }
+  
+  if (!window.pendingTransaction) {
+    showNotification('No pending transaction', 'error');
+    closePinModal();
+    return;
+  }
+  
+  const { fromAccount, toAddress, amount, reference } = window.pendingTransaction;
+  
+  // Close modal and show loading
+  closePinModal();
   showLoading('Sending transaction...');
 
   try {
-    await wallet.send(accountName, amount, recipient, reference);
+    // Send transaction with PIN
+    await wallet.send(fromAccount, amount, toAddress, pin, reference);
+    
+    // Clear PIN from memory
+    document.getElementById('confirm-pin').value = '';
+    
     showNotification('Transaction sent successfully!', 'success');
     
     // Clear form
@@ -450,9 +585,13 @@ async function handleSend() {
     showScreen('wallet');
     await loadWalletData();
   } catch (error) {
+    // Clear PIN on error too
+    document.getElementById('confirm-pin').value = '';
+    
     showNotification('Failed to send: ' + error.message, 'error');
   } finally {
     hideLoading();
+    window.pendingTransaction = null;
   }
 }
 
@@ -713,18 +852,24 @@ async function handleRevokeConnection(domain) {
 
 // Handle save node URL
 async function handleSaveNode() {
-  const url = document.getElementById('node-url').value.trim();
+  const newUrl = document.getElementById('node-url').value.trim();
   
-  if (!url) {
+  if (!newUrl) {
     showNotification('Please enter a node URL', 'error');
     return;
   }
 
   try {
-    await wallet.updateNodeUrl(url);
-    showNotification('Node URL updated successfully!', 'success');
+    // Validate URL with HTTPS enforcement
+    const validatedUrl = validateNodeUrl(newUrl);
+    
+    await wallet.updateNodeUrl(validatedUrl);
+    showNotification('Node URL updated successfully', 'success');
+    
+    // Update the input field with validated URL (in case HTTP was converted to HTTPS)
+    document.getElementById('node-url').value = validatedUrl;
   } catch (error) {
-    showNotification('Failed to update node URL', 'error');
+    showNotification('Failed to update node URL: ' + error.message, 'error');
   }
 }
 

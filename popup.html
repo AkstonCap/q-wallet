@@ -283,6 +283,45 @@
       <div class="loading-text">Processing...</div>
     </div>
 
+    <!-- PIN Confirmation Modal -->
+    <div id="pin-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3>Confirm Transaction</h3>
+        <div class="transaction-summary-modal">
+          <div class="summary-row">
+            <span>From:</span>
+            <span id="modal-from-account">-</span>
+          </div>
+          <div class="summary-row">
+            <span>To:</span>
+            <span id="modal-to-address" class="truncate">-</span>
+          </div>
+          <div class="summary-row">
+            <span>Amount:</span>
+            <span id="modal-amount">-</span>
+          </div>
+          <div class="summary-row" id="modal-reference-row" style="display: none;">
+            <span>Reference:</span>
+            <span id="modal-reference">-</span>
+          </div>
+          <div class="summary-row total">
+            <span>Total Amount:</span>
+            <span id="modal-total">-</span>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="confirm-pin">Enter PIN to Confirm</label>
+          <input type="password" id="confirm-pin" placeholder="Enter your PIN" maxlength="8" autocomplete="off">
+        </div>
+        
+        <div class="modal-actions">
+          <button id="cancel-transaction-btn" class="btn btn-secondary">Cancel</button>
+          <button id="confirm-transaction-btn" class="btn btn-primary">Confirm & Send</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Notification Toast -->
     <div id="notification" class="notification hidden">
       <span id="notification-text"></span>

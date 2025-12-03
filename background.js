@@ -6,6 +6,7 @@ importScripts('services/nexus-api.js', 'services/storage.js', 'services/wallet.j
 
 let wallet;
 const pendingApprovals = new Map(); // Store pending connection approval requests
+const pendingTransactionApprovals = new Map(); // Store pending transaction approval requests
 
 // Initialize on install
 chrome.runtime.onInstalled.addListener(async () => {
@@ -41,6 +42,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       // Resolve the promise
       pending.resolve(approved);
       pendingApprovals.delete(requestId);
+      
+      // Close the window
+      if (pending.windowId) {
+        chrome.windows.remove(pending.windowId).catch(() => {});
+      }
+    }
+    
+    sendResponse({ success: true });
+    return true;
+  }
+  
+  // Handle transaction approval responses
+  if (request.type === 'TRANSACTION_APPROVAL_RESPONSE') {
+    const { requestId, approved, pin, transactionData } = request;
+    console.log('Transaction approval response received:', { requestId, approved });
+    
+    const pending = pendingTransactionApprovals.get(requestId);
+    if (pending) {
+      // Resolve the promise with approval status and PIN
+      pending.resolve({ approved, pin, transactionData });
+      pendingTransactionApprovals.delete(requestId);
       
       // Close the window
       if (pending.windowId) {
@@ -148,7 +170,8 @@ async function handleMessage(request, sender) {
       if (!wallet.isLoggedIn()) {
         throw new Error('Wallet not connected');
       }
-      return { result: await wallet.send(params.from, params.amount, params.to, params.reference) };
+      // Request transaction approval from user with PIN
+      return await handleDAppTransaction(params);
 
     default:
       throw new Error(`Unknown method: ${method}`);
@@ -267,6 +290,108 @@ async function requestUserApproval(origin) {
   });
 }
 
+// Handle dApp transaction request with user approval
+async function handleDAppTransaction(params) {
+  const { origin, from, to, amount, reference } = params;
+  
+  // Request user approval via popup
+  const approval = await requestTransactionApproval({
+    origin,
+    from: from || 'default',
+    to,
+    amount,
+    reference: reference || ''
+  });
+  
+  if (!approval.approved) {
+    throw new Error('Transaction rejected by user');
+  }
+  
+  if (!approval.pin) {
+    throw new Error('PIN is required for transaction');
+  }
+  
+  // Execute transaction with user-provided PIN
+  try {
+    const result = await wallet.send(
+      approval.transactionData.from,
+      approval.transactionData.amount,
+      approval.transactionData.to,
+      approval.pin,
+      approval.transactionData.reference
+    );
+    
+    return { result };
+  } catch (error) {
+    console.error('Transaction failed:', error);
+    throw new Error('Transaction failed: ' + error.message);
+  }
+}
+
+// Request user approval for dApp transaction
+async function requestTransactionApproval(transactionData) {
+  return new Promise((resolve, reject) => {
+    const requestId = Date.now().toString();
+    console.log('Requesting transaction approval:', transactionData, 'requestId:', requestId);
+    
+    // Store the pending request
+    pendingTransactionApprovals.set(requestId, { 
+      transactionData, 
+      resolve, 
+      reject 
+    });
+    
+    // Create popup window for approval
+    const width = 420;
+    const height = 580;
+    
+    // Build URL with transaction parameters
+    const params = new URLSearchParams({
+      requestId,
+      origin: transactionData.origin,
+      from: transactionData.from,
+      to: transactionData.to,
+      amount: transactionData.amount,
+      reference: transactionData.reference
+    });
+    
+    chrome.windows.create({
+      url: `approve-transaction.html?${params.toString()}`,
+      type: 'popup',
+      width: width,
+      height: height,
+      focused: true
+    }, (window) => {
+      if (chrome.runtime.lastError) {
+        console.error('Failed to create approval window:', chrome.runtime.lastError);
+        pendingTransactionApprovals.delete(requestId);
+        reject(new Error('Unable to show approval dialog'));
+        return;
+      }
+      
+      console.log('Transaction approval window created:', window.id);
+      
+      // Store window ID with the request
+      const pending = pendingTransactionApprovals.get(requestId);
+      if (pending) {
+        pending.windowId = window.id;
+      }
+      
+      // Add timeout - auto-deny after 3 minutes
+      setTimeout(() => {
+        if (pendingTransactionApprovals.has(requestId)) {
+          console.log('Transaction approval request timed out');
+          pendingTransactionApprovals.delete(requestId);
+          reject(new Error('Transaction approval request timed out'));
+          
+          // Close the window if still open
+          chrome.windows.remove(window.id).catch(() => {});
+        }
+      }, 180000);
+    });
+  });
+}
+
 // Handle connection response from approval popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'CONNECTION_RESPONSE') {
@@ -354,36 +479,44 @@ setInterval(async () => {
 // This happens when the browser closes or the extension is reloaded
 self.addEventListener('beforeunload', async () => {
   console.log('Service worker terminating, cleaning up session');
-  if (wallet && wallet.isLoggedIn()) {
-    try {
-      const sessionInfo = wallet.getSessionInfo();
-      if (sessionInfo && sessionInfo.session) {
-        const storage = new StorageService();
-        const nodeUrl = await storage.getNodeUrl();
-        const api = new NexusAPI(nodeUrl);
-        await api.terminateSession(sessionInfo.session);
-        await storage.clearSession(); // Clear session from storage
-        console.log('Nexus session terminated successfully');
-      }
-    } catch (error) {
-      console.error('Failed to terminate Nexus session:', error);
-    }
-  }
+  await cleanupSession('service worker termination');
 });
 
 // Also handle extension being disabled/uninstalled
 chrome.management.onDisabled.addListener(async (info) => {
   if (info.id === chrome.runtime.id) {
     console.log('Extension disabled, terminating session');
-    if (wallet && wallet.isLoggedIn()) {
-      try {
-        await wallet.logout();
-      } catch (error) {
-        console.error('Failed to terminate session on disable:', error);
-      }
-    }
+    await cleanupSession('extension disabled');
   }
 });
+
+// Handle service worker lifecycle - cleanup on suspend
+chrome.runtime.onSuspend.addListener(async () => {
+  console.log('Service worker suspending, cleaning up session');
+  await cleanupSession('service worker suspend');
+});
+
+// Periodic session validation (every 30 seconds)
+// Ensures session is still valid and cleans up if not
+setInterval(async () => {
+  if (wallet && wallet.isLoggedIn()) {
+    try {
+      const sessionInfo = wallet.getSessionInfo();
+      if (sessionInfo && sessionInfo.session) {
+        // Verify session is still in storage
+        const storage = new StorageService();
+        const storedSession = await storage.getSession();
+        
+        if (!storedSession || storedSession.session !== sessionInfo.session) {
+          console.warn('Session mismatch detected, cleaning up');
+          await cleanupSession('session validation failure');
+        }
+      }
+    } catch (error) {
+      console.error('Session validation error:', error);
+    }
+  }
+}, 30000);
 
 // Clean up session data when browser window is closed
 // Listen for all windows being removed
@@ -392,22 +525,52 @@ chrome.windows.onRemoved.addListener(async (windowId) => {
   if (windows.length === 0) {
     // Last window closed, clean up session
     console.log('Last browser window closed, terminating session');
+    await cleanupSession('browser close');
+  }
+});
+
+// Centralized session cleanup function (defense in depth)
+async function cleanupSession(reason = 'unknown') {
+  console.log(`Cleaning up session (reason: ${reason})`);
+  
+  try {
+    const storage = new StorageService();
+    
+    // Step 1: Terminate session on blockchain node (if logged in)
     if (wallet && wallet.isLoggedIn()) {
       try {
         const sessionInfo = wallet.getSessionInfo();
         if (sessionInfo && sessionInfo.session) {
-          const storage = new StorageService();
           const nodeUrl = await storage.getNodeUrl();
           const api = new NexusAPI(nodeUrl);
           await api.terminateSession(sessionInfo.session);
-          await storage.clearSession();
-          console.log('Nexus session terminated on browser close');
+          console.log(`Nexus session terminated on ${reason}`);
         }
       } catch (error) {
-        console.error('Failed to terminate session on browser close:', error);
+        console.error('Failed to terminate Nexus session:', error);
+        // Continue with storage cleanup even if termination fails
       }
     }
+    
+    // Step 2: Securely clear session from storage
+    await storage.clearSession();
+    
+    // Step 3: Clear any remaining session-prefixed data (fallback mode)
+    if (!storage.useSessionAPI) {
+      await storage.clearAllSessionData();
+    }
+    
+    // Step 4: Reset wallet state
+    if (wallet) {
+      wallet.session = null;
+      wallet.genesis = null;
+      wallet.isLocked = true;
+    }
+    
+    console.log(`Session cleanup completed (${reason})`);
+  } catch (error) {
+    console.error(`Session cleanup error (${reason}):`, error);
   }
-});
+}
 
 console.log('Nexus Wallet background service worker loaded');

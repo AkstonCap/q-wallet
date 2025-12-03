@@ -1,36 +1,37 @@
 # dApp Integration Guide
 
-## Connecting to Distordia Q-wallet
+## Connecting Your Website to Q-Wallet
 
-The Distordia Q-wallet provides a secure way for websites to interact with the Nexus blockchain through the browser extension.
+The Q-Wallet browser extension provides a secure way for websites to interact with the Nexus blockchain, similar to how MetaMask works for Ethereum.
 
-## Security Model
+## How It Works
 
-### User Approval Required
-When a website attempts to connect to your wallet for the first time, you'll receive a **notification** asking for approval:
+### Connection Approval
+When your website attempts to connect to the wallet for the first time, the user receives a **popup notification** asking for approval:
 
-- **Approve**: The site will be added to your approved list and can access wallet functions
-- **Deny**: The connection request is rejected and the site cannot access your wallet
+- **Approve**: Your site is added to the approved list and can access wallet functions
+- **Deny**: The connection is rejected and your site cannot access the wallet
 
-### Permission Management
+### User Security
 - Only **approved sites** can call wallet functions
-- **Blocked sites** are permanently denied access
-- You can **revoke access** anytime from Settings → Connected Sites
+- **All transactions** require the user to re-enter their PIN for confirmation
+- Users can **revoke access** anytime from wallet Settings
 - Each site connection is tracked by domain (e.g., `https://example.com`)
 
-### What Sites Can Access
-Approved sites can:
-- Request your wallet address
-- Request your account balance
+### What Your Site Can Do
+After approval, your site can:
+- Request the user's wallet address
+- Request account balance
 - Request transaction history
-- **Request to send transactions** (requires additional confirmation)
+- **Request to send transactions** (user must approve each transaction with their PIN)
 
-Approved sites **cannot**:
-- Access your password or PIN
-- Send transactions without your explicit approval
-- Access your private keys
+Your site **cannot**:
+- Access the user's password or PIN
+- Send transactions without user approval
+- Access private keys
+- Make transactions without the user confirming
 
-## For Website Developers
+## Getting Started
 
 ### Basic Connection
 
@@ -50,17 +51,66 @@ async function connectWallet() {
   }
 }
 
-// Check existing connection
+### Check existing connection
 async function checkConnection() {
   try {
     const accounts = await window.nexus.getAccounts();
     if (accounts.length > 0) {
       console.log('Already connected:', accounts[0]);
+      return true;
     }
+    return false;
   } catch (error) {
     console.log('Not connected');
+    return false;
   }
 }
+```
+
+### Complete Example
+
+```javascript
+// Initialize your dApp
+async function initDApp() {
+  // 1. Check if wallet is installed
+  if (typeof window.nexus === 'undefined') {
+    alert('Please install Q-Wallet extension');
+    return;
+  }
+
+  // 2. Check if already connected
+  try {
+    const accounts = await window.nexus.getAccounts();
+    if (accounts.length > 0) {
+      console.log('Already connected:', accounts[0]);
+      updateUI(accounts[0]);
+      return;
+    }
+  } catch (error) {
+    console.log('Not connected yet');
+  }
+
+  // 3. Request connection
+  document.getElementById('connectBtn').addEventListener('click', async () => {
+    try {
+      const accounts = await window.nexus.connect();
+      console.log('Connected:', accounts[0]);
+      updateUI(accounts[0]);
+    } catch (error) {
+      console.error('User denied connection:', error);
+    }
+  });
+}
+
+// Update your UI with wallet info
+function updateUI(account) {
+  document.getElementById('walletAddress').textContent = account;
+  document.getElementById('connectBtn').style.display = 'none';
+  document.getElementById('walletInfo').style.display = 'block';
+}
+
+// Initialize when page loads
+window.addEventListener('load', initDApp);
 ```
 
 ### Get Balance
@@ -76,124 +126,312 @@ async function getBalance() {
 }
 ```
 
-### Send Transaction
+### Send Transaction (with User Approval)
 
 ```javascript
-async function sendTransaction() {
+async function sendNXS() {
   try {
     const result = await window.nexus.sendTransaction({
-      from: 'default',
-      to: 'recipient_address_or_username',
-      amount: 10.5,
-      reference: 'Payment for services'
+      from: 'default',                      // Account name
+      to: 'recipient_username_or_address',  // Recipient
+      amount: 10.5,                         // Amount in NXS
+      reference: 'Payment for services'     // Optional memo
     });
-    console.log('Transaction sent:', result);
+    
+    console.log('Transaction sent!');
+    console.log('TX Hash:', result.txid);
+    alert('Transaction successful!');
   } catch (error) {
     console.error('Transaction failed:', error);
+    alert('Transaction cancelled or failed');
   }
 }
 ```
 
+**Important:** This will show a popup to the user asking them to confirm and enter their PIN. The transaction will only proceed if they approve it.
+
 ### Get Transaction History
 
 ```javascript
-async function getHistory() {
+async function getTransactionHistory() {
   try {
     const transactions = await window.nexus.getTransactionHistory(50);
     console.log('Recent transactions:', transactions);
+    
+    // Display transactions
+    transactions.forEach(tx => {
+      console.log(`${tx.amount} NXS to ${tx.recipient}`);
+    });
   } catch (error) {
     console.error('Failed to get history:', error);
   }
 }
 ```
 
-## Testing Your Integration
+## Complete API Reference
 
-1. Load the extension in your browser
-2. Log in to your wallet
-3. Open your website
-4. Call `window.nexus.connect()` - you should see an approval notification
-5. Click **Approve** in the notification
-6. Your site can now interact with the wallet
+### window.nexus.connect()
+Request connection to the user's wallet. Shows approval popup to user.
 
-## Best Practices
+**Returns:** `Promise<Array<string>>` - Array of account names/addresses
 
-### Handle Connection Errors
+**Example:**
+```javascript
+const accounts = await window.nexus.connect();
+// Returns: ['account-address-or-name']
+```
+
+### window.nexus.getAccounts()
+Get currently connected accounts without requesting new connection.
+
+**Returns:** `Promise<Array<string>>` - Array of account names, or empty array if not connected
+
+**Example:**
+```javascript
+const accounts = await window.nexus.getAccounts();
+if (accounts.length === 0) {
+  // Not connected
+}
+```
+
+### window.nexus.getBalance(account)
+Get balance for specified account.
+
+**Parameters:**
+- `account` (string, optional): Account name, defaults to 'default'
+
+**Returns:** `Promise<number>` - Balance in NXS
+
+**Example:**
+```javascript
+const balance = await window.nexus.getBalance('default');
+console.log(`Balance: ${balance} NXS`);
+```
+
+### window.nexus.sendTransaction(params)
+Request to send a transaction. Shows approval popup to user with PIN requirement.
+
+**Parameters:**
+- `params.from` (string): Sender account name
+- `params.to` (string): Recipient address or username
+- `params.amount` (number): Amount to send in NXS
+- `params.reference` (string, optional): Transaction memo
+
+**Returns:** `Promise<object>` - Transaction result with txid
+
+**Example:**
+```javascript
+const result = await window.nexus.sendTransaction({
+  from: 'default',
+  to: 'recipient',
+  amount: 10.5,
+  reference: 'Payment'
+});
+console.log('TX:', result.txid);
+```
+
+### window.nexus.getTransactionHistory(limit)
+Get transaction history for the connected account.
+
+**Parameters:**
+- `limit` (number, optional): Maximum number of transactions, defaults to 50
+
+**Returns:** `Promise<Array<object>>` - Array of transaction objects
+
+**Example:**
+```javascript
+const txs = await window.nexus.getTransactionHistory(10);
+```
+
+### window.nexus.isWalletConnected()
+Check if wallet is currently connected.
+
+**Returns:** `Promise<boolean>`
+
+**Example:**
+```javascript
+const connected = await window.nexus.isWalletConnected();
+```
+
+## Error Handling
+
+Always wrap wallet calls in try-catch blocks and handle errors appropriately:
+
 ```javascript
 try {
   const accounts = await window.nexus.connect();
-  // Connection successful
+  // Success
 } catch (error) {
   if (error.message.includes('denied')) {
-    // User explicitly denied connection
-    alert('Please approve wallet connection to continue');
+    // User denied the connection
+    alert('Please approve the wallet connection to use this dApp');
   } else if (error.message.includes('not connected')) {
     // Wallet not logged in
-    alert('Please log in to your Nexus wallet');
+    alert('Please log in to your Q-Wallet');
   } else {
     // Other error
-    console.error('Connection error:', error);
+    console.error('Wallet error:', error);
+    alert('Failed to connect to wallet');
   }
 }
 ```
 
-### Check Connection State
-```javascript
-async function initDApp() {
-  // Check if wallet exists
-  if (typeof window.nexus === 'undefined') {
-    alert('Please install Distordia Q-wallet extension');
-    return;
-  }
+## Best Practices
 
-  // Check if already connected
+### 1. Check for Wallet Installation
+
+```javascript
+if (typeof window.nexus === 'undefined') {
+  alert('Please install Q-Wallet: https://github.com/yourusername/qwallet');
+  return;
+}
+```
+
+### 2. Handle Connection State
+
+```javascript
+async function ensureConnection() {
   const accounts = await window.nexus.getAccounts();
   if (accounts.length === 0) {
-    // Not connected, request connection
+    // Request connection
     await window.nexus.connect();
+  }
+  return true;
+}
+```
+
+### 3. Validate User Input
+
+```javascript
+async function sendTransaction() {
+  const amount = parseFloat(document.getElementById('amount').value);
+  
+  if (isNaN(amount) || amount <= 0) {
+    alert('Please enter a valid amount');
+    return;
+  }
+  
+  const recipient = document.getElementById('recipient').value.trim();
+  if (!recipient) {
+    alert('Please enter a recipient');
+    return;
+  }
+  
+  // Proceed with transaction
+  await window.nexus.sendTransaction({
+    from: 'default',
+    to: recipient,
+    amount: amount
+  });
+}
+```
+
+### 4. Provide Clear User Feedback
+
+```javascript
+async function sendWithFeedback() {
+  const button = document.getElementById('sendBtn');
+  button.disabled = true;
+  button.textContent = 'Processing...';
+  
+  try {
+    const result = await window.nexus.sendTransaction({
+      from: 'default',
+      to: 'recipient',
+      amount: 10
+    });
+    
+    alert('Transaction successful!');
+    console.log('TX:', result.txid);
+  } catch (error) {
+    alert('Transaction failed: ' + error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Send';
   }
 }
 ```
 
-### Listen for Account Changes
+### 5. Monitor Connection Status
+
 ```javascript
-// Currently, you should periodically check connection
+// Check connection periodically
 setInterval(async () => {
   const accounts = await window.nexus.getAccounts();
   if (accounts.length === 0) {
     // User disconnected
-    handleDisconnect();
+    showConnectButton();
   }
 }, 5000);
 ```
 
-## Security Recommendations
+## Testing Your Integration
 
-### For Users
-- Only approve connections for websites you trust
-- Review connected sites regularly in Settings
-- Revoke access for sites you no longer use
-- Never approve connections from unfamiliar or suspicious sites
+1. **Install the Q-Wallet extension** in your browser
+2. **Create a wallet** and log in
+3. **Open your website** with the integration code
+4. **Click "Connect Wallet"** - you should see an approval popup
+5. **Approve the connection** in the wallet
+6. **Test all features:**
+   - Getting balance
+   - Viewing transaction history
+   - Sending transactions (with PIN confirmation)
 
-### For Developers
-- Always handle connection errors gracefully
-- Display clear information about why you need wallet access
-- Never request more permissions than necessary
-- Respect user's decision to deny connection
-- Store minimal user data from wallet interactions
+## Example Application
 
-## Example dApp
-
-See `example-dapp.html` for a complete working example demonstrating:
+A complete example dApp is included in the wallet repository as `example-dapp.html`. It demonstrates:
+- Wallet detection
 - Connection request with approval
 - Balance checking
-- Transaction sending
-- Error handling
+- Transaction sending with error handling
+- Transaction history display
 
-## Support
+## Common Issues
 
-For issues or questions:
-- Check the browser console for error messages
-- Ensure you're logged into the wallet
-- Verify the site is approved in Settings → Connected Sites
-- Try revoking and re-approving the connection
+### "window.nexus is undefined"
+- User doesn't have Q-Wallet installed
+- Extension is disabled
+- Page loaded before extension injected (wait for page load)
+
+### "User denied connection"
+- User clicked "Deny" in the approval popup
+- Ask user to try again and click "Approve"
+
+### "Not connected"
+- User is not logged into their wallet
+- Ask them to open Q-Wallet and log in
+
+### "Transaction failed"
+- User cancelled the transaction
+- User entered wrong PIN
+- Insufficient balance
+- Network/node connection issue
+
+## Security Recommendations
+
+### For dApp Developers
+1. ✅ Always handle user rejection gracefully
+2. ✅ Validate all user inputs before sending to wallet
+3. ✅ Show clear information about what your dApp will do
+4. ✅ Never request more permissions than necessary
+5. ✅ Respect user's decision to deny connection
+6. ✅ Use HTTPS for your website
+7. ✅ Test with small amounts first
+
+### For Users
+1. ✅ Only approve connections from websites you trust
+2. ✅ Review all transaction details before confirming
+3. ✅ Never share your PIN with anyone
+4. ✅ Check the website URL before connecting
+5. ✅ Revoke access for sites you no longer use (in wallet Settings)
+
+## Need Help?
+
+- **Example Code**: See `example-dapp.html` in the wallet repository
+- **Wallet Docs**: Check the main [README.md](README.md)
+- **Issues**: Report problems on GitHub
+- **Community**: Join the Nexus community forums
+
+---
+
+**Start building amazing dApps on Nexus! 🚀**

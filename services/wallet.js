@@ -252,12 +252,17 @@ class WalletService {
   }
 
   // Send transaction
-  async send(accountName, amount, recipientAddress, reference = '') {
+  async send(accountName, amount, recipientAddress, pin, reference = '') {
     try {
       // Validate amount
       const parsedAmount = parseFloat(amount);
       if (isNaN(parsedAmount) || parsedAmount <= 0) {
         throw new Error('Invalid amount');
+      }
+
+      // Validate PIN
+      if (!pin || pin.length < 4) {
+        throw new Error('Valid PIN is required');
       }
 
       // Check balance
@@ -266,11 +271,12 @@ class WalletService {
         throw new Error('Insufficient balance');
       }
 
-      // Send transaction
+      // Send transaction with PIN
       const result = await this.api.debit(
         accountName,
         parsedAmount,
         recipientAddress,
+        pin,
         reference,
         this.session
       );

@@ -3,12 +3,36 @@
 
 class NexusAPI {
   constructor(nodeUrl = 'http://localhost:8080') {
-    this.nodeUrl = nodeUrl;
+    this.validateAndSetNodeUrl(nodeUrl);
   }
 
-  // Set node URL
+  // Validate and set node URL with HTTPS enforcement
+  validateAndSetNodeUrl(url) {
+    // Validate URL format
+    try {
+      const urlObj = new URL(url);
+      
+      // SECURITY: Enforce HTTPS for remote connections
+      if (urlObj.hostname !== 'localhost' && 
+          urlObj.hostname !== '127.0.0.1' && 
+          !urlObj.hostname.startsWith('192.168.') &&
+          !urlObj.hostname.startsWith('10.') &&
+          urlObj.protocol === 'http:') {
+        throw new Error('HTTPS is required for remote connections. Use https:// instead of http://');
+      }
+      
+      this.nodeUrl = url;
+    } catch (error) {
+      if (error.message.includes('HTTPS is required')) {
+        throw error;
+      }
+      throw new Error('Invalid node URL format');
+    }
+  }
+
+  // Set node URL (with validation)
   setNodeUrl(url) {
-    this.nodeUrl = url;
+    this.validateAndSetNodeUrl(url);
   }
 
   // Make API request
@@ -123,30 +147,33 @@ class NexusAPI {
   }
 
   // Create a new account
-  async createAccount(name, token = 'NXS', session) {
+  async createAccount(name, token = 'NXS', session, pin) {
     return this.request('finance/create/account', {
       name,
       token,
-      session
+      session,
+      pin
     });
   }
 
   // Send NXS or tokens (debit)
-  async debit(accountName, amount, recipientAddress, reference = '', session) {
+  async debit(accountName, amount, recipientAddress, pin, reference = '', session) {
     return this.request('finance/debit/account', {
+      pin,
+      session,
       from: accountName,
       amount: parseFloat(amount),
       to: recipientAddress,
-      reference,
-      session
+      reference
     });
   }
 
   // Credit (claim) a debit transaction
-  async credit(txid, session) {
+  async credit(txid, pin, session) {
     return this.request('finance/credit/account', {
-      txid,
-      session
+      pin,
+      session,
+      txid
     });
   }
 

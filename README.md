@@ -1,4 +1,4 @@
-# Nexus Wallet Browser Extension
+# Distordia Q-Wallet
 
 A secure cryptocurrency wallet browser extension for the Nexus blockchain, similar to MetaMask but specifically designed for Nexus.io.
 

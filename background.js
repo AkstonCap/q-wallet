@@ -193,6 +193,9 @@ async function checkDAppPermission(origin) {
   if (!isApproved) {
     throw new Error('This domain is not approved. Please connect first.');
   }
+
+  // Update activity timestamp for this domain
+  await storage.updateDomainActivity(origin);
 }
 
 // Handle DApp connection request
@@ -214,6 +217,9 @@ async function handleDAppConnection(sender, params) {
   // Check if already approved
   const isApproved = await storage.isDomainApproved(origin);
   if (isApproved) {
+    // Update activity timestamp
+    await storage.updateDomainActivity(origin);
+    
     const address = await wallet.getAccountAddress('default');
     return {
       result: {
@@ -228,6 +234,9 @@ async function handleDAppConnection(sender, params) {
   
   if (approved) {
     await storage.addApprovedDomain(origin);
+    // Set initial activity timestamp
+    await storage.updateDomainActivity(origin);
+    
     const address = await wallet.getAccountAddress('default');
     return {
       result: {
@@ -572,5 +581,19 @@ async function cleanupSession(reason = 'unknown') {
     console.error(`Session cleanup error (${reason}):`, error);
   }
 }
+
+// Periodic cleanup of inactive dApp connections (every 5 minutes)
+setInterval(async () => {
+  try {
+    const storage = new StorageService();
+    const inactiveDomains = await storage.cleanupInactiveDomains(30 * 60 * 1000); // 30 minutes
+    
+    if (inactiveDomains.length > 0) {
+      console.log('Disconnected inactive dApps:', inactiveDomains);
+    }
+  } catch (error) {
+    console.error('Failed to cleanup inactive dApps:', error);
+  }
+}, 5 * 60 * 1000); // Check every 5 minutes
 
 console.log('Nexus Wallet background service worker loaded');

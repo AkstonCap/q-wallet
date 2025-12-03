@@ -285,6 +285,49 @@ class StorageService {
     const blocked = await this.getBlockedDomains();
     return blocked.includes(domain);
   }
+
+  // ===== DApp Activity Tracking =====
+
+  // Update last activity timestamp for a domain
+  async updateDomainActivity(domain) {
+    const activities = await this.get('domainActivities') || {};
+    activities[domain] = Date.now();
+    await this.set('domainActivities', activities);
+  }
+
+  // Get last activity timestamp for a domain
+  async getDomainActivity(domain) {
+    const activities = await this.get('domainActivities') || {};
+    return activities[domain] || null;
+  }
+
+  // Clean up inactive domains (older than timeout in milliseconds)
+  async cleanupInactiveDomains(timeoutMs = 30 * 60 * 1000) { // 30 minutes default
+    const activities = await this.get('domainActivities') || {};
+    const approved = await this.getApprovedDomains();
+    const now = Date.now();
+    const inactiveDomains = [];
+
+    for (const domain of approved) {
+      const lastActivity = activities[domain];
+      if (lastActivity && (now - lastActivity) > timeoutMs) {
+        inactiveDomains.push(domain);
+      }
+    }
+
+    // Remove inactive domains
+    for (const domain of inactiveDomains) {
+      await this.removeApprovedDomain(domain);
+      delete activities[domain];
+    }
+
+    // Update activities
+    if (inactiveDomains.length > 0) {
+      await this.set('domainActivities', activities);
+    }
+
+    return inactiveDomains;
+  }
 }
 
 // Export for use in other modules

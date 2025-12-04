@@ -50,8 +50,8 @@ A secure cryptocurrency wallet browser extension for the Nexus blockchain, simil
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/qwallet.git
-cd qwallet
+git clone https://github.com/AkstonCap/q-wallet.git
+cd q-wallet
 
 # No build process required - it's vanilla JavaScript!
 # Just load the extension in your browser as described above
@@ -73,8 +73,8 @@ Before using the wallet, you need a Nexus node running. You can:
 ```
 
 **Option B: Connect to a Remote Node**
-- Use a public Nexus node or hosted service
-- Configure the node URL in wallet settings
+- Use a public Nexus node or hosted service like api.distordia.com
+- Configure the node URL in wallet settings (api.distordia.com available as default)
 
 ### 2. Create Your Wallet
 
@@ -86,7 +86,7 @@ Before using the wallet, you need a Nexus node running. You can:
    - **PIN**: 4-8 digit PIN for transaction approval
 4. Confirm and create
 
-**⚠️ Important:** Your password and PIN cannot be recovered. Store them safely!
+**⚠️ Important:** Store your username, password and PIN safely! If you forget them, you can only recover your wallet using your private seed phrase (never share this with anyone).
 
 ### 3. Using the Wallet
 
@@ -186,7 +186,6 @@ For complete dApp integration documentation, see [DAPP-INTEGRATION.md](DAPP-INTE
 
 ### What's NEVER Stored
 - ❌ Your username, password, or PIN
-- ❌ Private keys (managed by Nexus node)
 - ❌ Any sensitive credentials
 
 ## Frequently Asked Questions
@@ -198,13 +197,13 @@ Your wallet is created on the Nexus blockchain, not in the browser extension. Ma
 Yes! The Nexus blockchain supports multiple accounts per profile. Create additional accounts in the wallet settings.
 
 ### What if I forget my password or PIN?
-Unfortunately, these cannot be recovered. Always keep secure backups of your credentials.
+If you forget your username, password or PIN, you can recover access to your wallet using the private seed phrase, these must be created in the Nexus desktop wallet (Nexus Interface) or CLI. Always keep secure backups of your credentials and seed phrase.
 
 ### Is my wallet secure?
 Yes! Your credentials are never stored in the extension. Session tokens are temporary and auto-clear when you close your browser. All transactions require PIN confirmation.
 
 ### Can I use this with hardware wallets?
-Not currently, but this feature is planned for future releases.
+Not currently.
 
 ### How do I connect to a remote Nexus node?
 Go to Settings → Node Settings, and enter your remote node URL. For security, only HTTPS connections are allowed for remote nodes (localhost/LAN can use HTTP).
@@ -238,20 +237,6 @@ Chrome, Brave, Edge, and other Chromium-based browsers are fully supported. Fire
 
 ### Icons Not Showing
 The extension works perfectly without icons. If you want custom icons, open `generate-icons.html` in your browser and save the generated images to the `icons/` folder.
-
-## Future Plans
-
-Planned features for future releases:
-- Multi-account UI improvements
-- Token management for custom tokens
-- Hardware wallet integration
-- Address book
-- Transaction export
-- Multi-language support
-- Dark mode theme
-- NFT support
-- Staking interface
-- DeFi integrations
 
 ## License
 

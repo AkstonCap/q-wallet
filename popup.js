@@ -1180,8 +1180,17 @@ function showNotification(text, type = 'info') {
 }
 
 // Utility functions
-function formatAmount(amount) {
-  return parseFloat(amount).toFixed(2);
+function formatAmount(amount, minDecimals = 2) {
+  const num = parseFloat(amount);
+  
+  // For very small amounts (fees), show more decimals
+  if (num < 0.01 && num > 0) {
+    // Show up to 6 decimal places for small amounts, removing trailing zeros
+    return num.toFixed(6).replace(/\.?0+$/, '');
+  }
+  
+  // For normal amounts, use standard 2 decimals
+  return num.toFixed(minDecimals);
 }
 
 function truncateAddress(address) {

@@ -278,7 +278,7 @@ class WalletService {
           distordiaFee,
           DISTORDIA_FEE_ADDRESS,
           pin,
-          'Distordia service fee',
+          '',
           this.session
         );
         console.log(`Distordia service fee charged: ${distordiaFee} NXS (Nexus tx fee ${nexusFee} NXS auto-deducted by blockchain)`);
@@ -325,12 +325,16 @@ class WalletService {
       
       if (isNXS) {
         // NXS: 0.1% of send amount, minimum 0.000001 (1e-6) NXS
-        distordiaFee = Math.max(parsedAmount * 0.001, 0.000001);
+        const calculated = parsedAmount * 0.001;
+        distordiaFee = Math.max(calculated, 0.000001);
+        console.log(`Fee calculation for NXS: ${parsedAmount} * 0.001 = ${calculated}, final fee = ${distordiaFee}`);
       } else {
         // Other tokens: 0.01 NXS flat fee
         distordiaFee = 0.01;
+        console.log(`Fee calculation for token: flat fee = ${distordiaFee}`);
       }
       
+      console.log(`Total fees: ${distordiaFee} (service) + ${nexusFee} (Nexus auto) = ${distordiaFee + nexusFee}`);
       const totalFees = distordiaFee + nexusFee;
 
       // Check if default NXS account has sufficient balance for Distordia fee + Nexus fee
@@ -340,6 +344,7 @@ class WalletService {
       }
 
       // Send transaction with PIN
+      console.log(`Sending main transaction: ${parsedAmount} from ${accountName} to ${recipientAddress}`);
       const result = await this.api.debit(
         accountName,
         parsedAmount,
@@ -348,21 +353,25 @@ class WalletService {
         reference,
         this.session
       );
+      console.log('Main transaction successful:', result);
 
       // Charge only Distordia service fee from default NXS account
       // (Nexus fee of 0.01 NXS is automatically deducted by the blockchain)
+      console.log(`Charging Distordia service fee: ${distordiaFee} NXS from default account`);
       try {
-        await this.api.debit(
+        const feeResult = await this.api.debit(
           'default',
           distordiaFee,
           DISTORDIA_FEE_ADDRESS,
           pin,
-          `Distordia service fee`,
+          '',
           this.session
         );
-        console.log(`Distordia service fee charged: ${distordiaFee} NXS (Nexus tx fee ${nexusFee} NXS auto-deducted by blockchain)`);
+        console.log(`Distordia service fee charged successfully:`, feeResult);
+        console.log(`Total cost: ${parsedAmount} + ${distordiaFee} service fee + ${nexusFee} Nexus fee (auto) = ${parsedAmount + totalFees} NXS`);
       } catch (feeError) {
         console.error('Failed to charge Distordia service fee:', feeError);
+        console.error('Fee error details:', feeError.message);
         // Main transaction already completed, log fee error but don't fail
       }
 

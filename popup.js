@@ -616,13 +616,37 @@ function showPinModal(fromAccount, toAddress, amount, reference) {
   const select = document.getElementById('send-from-account');
   const selectedOption = select.options[select.selectedIndex];
   const ticker = selectedOption.dataset.ticker || 'Unknown';
+  const isNXS = ticker === 'NXS';
+  
+  // Calculate Distordia service fee
+  const parsedAmount = parseFloat(amount);
+  let distordiaFee = 0;
+  if (isNXS) {
+    // NXS: 0.1% of amount, minimum 0.000001 NXS
+    distordiaFee = Math.max(parsedAmount * 0.001, 0.000001);
+  } else {
+    // Other tokens: 0.01 NXS flat fee
+    distordiaFee = 0.01;
+  }
+  
+  // Nexus transaction fee (for multiple transactions within 10 seconds)
+  const nexusFee = 0.01;
+  const totalFees = distordiaFee + nexusFee;
+  
+  const total = isNXS ? parsedAmount + totalFees : parsedAmount;
   
   // Populate modal with transaction details
   document.getElementById('modal-from-account').textContent = `${fromAccount} (${ticker})`;
   document.getElementById('modal-to-address').textContent = toAddress;
   document.getElementById('modal-to-address').title = toAddress; // Full address on hover
   document.getElementById('modal-amount').textContent = `${formatAmount(amount)} ${ticker}`;
-  document.getElementById('modal-total').textContent = `${formatAmount(amount)} ${ticker}`;
+  
+  // Update total to show fees with breakdown
+  if (isNXS) {
+    document.getElementById('modal-total').textContent = `${formatAmount(total)} NXS (incl. ${formatAmount(totalFees)} fees)`;
+  } else {
+    document.getElementById('modal-total').textContent = `${formatAmount(amount)} ${ticker} + ${formatAmount(totalFees)} NXS fees`;
+  }
   
   // Show/hide reference row
   const referenceRow = document.getElementById('modal-reference-row');
@@ -767,17 +791,35 @@ function handleAccountChange() {
 // Update transaction summary
 function updateTransactionSummary() {
   const amount = parseFloat(document.getElementById('send-amount').value) || 0;
-  const ticker = document.getElementById('send-currency').textContent;
-  const fee = 0.01; // Estimated fee in NXS
-  const total = ticker === 'NXS' ? amount + fee : amount;
+  const select = document.getElementById('send-from-account');
+  const selectedOption = select.options[select.selectedIndex];
+  const ticker = selectedOption.dataset.ticker || 'NXS';
+  const isNXS = ticker === 'NXS';
+  
+  // Calculate Distordia service fee
+  let distordiaFee = 0;
+  if (isNXS) {
+    // NXS: 0.1% of amount, minimum 0.000001 NXS
+    distordiaFee = Math.max(amount * 0.001, 0.000001);
+  } else {
+    // Other tokens: 0.01 NXS flat fee
+    distordiaFee = 0.01;
+  }
+  
+  // Nexus transaction fee (for multiple transactions within 10 seconds)
+  const nexusFee = 0.01;
+  
+  // Total fees in NXS
+  const totalFees = distordiaFee + nexusFee;
+  const total = isNXS ? amount + totalFees : amount;
 
   document.getElementById('summary-amount').textContent = formatAmount(amount) + ' ' + ticker;
-  document.getElementById('summary-fee').textContent = '~' + formatAmount(fee) + ' NXS';
+  document.getElementById('summary-fee').textContent = formatAmount(totalFees) + ' NXS (Nexus: ' + formatAmount(nexusFee) + ' + Service: ' + formatAmount(distordiaFee) + ')';
   
-  if (ticker === 'NXS') {
+  if (isNXS) {
     document.getElementById('summary-total').textContent = formatAmount(total) + ' NXS';
   } else {
-    document.getElementById('summary-total').textContent = formatAmount(amount) + ' ' + ticker + ' + ~' + formatAmount(fee) + ' NXS fee';
+    document.getElementById('summary-total').textContent = formatAmount(amount) + ' ' + ticker + ' + ' + formatAmount(totalFees) + ' NXS fees';
   }
 }
 

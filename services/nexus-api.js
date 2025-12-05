@@ -164,6 +164,7 @@ class NexusAPI {
 
   // Send NXS or tokens (debit)
   async debit(accountName, amount, recipientAddress, pin, reference = '', session) {
+    console.log(`[API] Debit request: ${amount} from ${accountName} to ${recipientAddress}`);
     const params = {
       pin,
       session,
@@ -177,7 +178,10 @@ class NexusAPI {
       params.reference = reference;
     }
     
-    return this.request('finance/debit/account', params);
+    console.log('[API] Debit params:', { ...params, pin: '***' });
+    const result = await this.request('finance/debit/account', params);
+    console.log('[API] Debit result:', result);
+    return result;
   }
 
   // Credit (claim) a debit transaction

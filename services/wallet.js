@@ -126,6 +126,18 @@ class WalletService {
   // Unlock wallet with PIN
   async unlock(pin) {
     try {
+      console.log('Unlock called with PIN present:', !!pin);
+      console.log('Current session:', this.session);
+      console.log('Current genesis:', this.genesis);
+      
+      if (!this.session) {
+        throw new Error('No active session to unlock');
+      }
+      
+      if (!pin) {
+        throw new Error('PIN is required to unlock session');
+      }
+      
       await this.api.unlockSession(pin, this.session);
       this.isLocked = false;
 
@@ -241,9 +253,9 @@ class WalletService {
   }
 
   // Create a new account
-  async createAccount(name, token = 'NXS') {
+  async createAccount(name, token = '0', pin) {
     try {
-      const result = await this.api.createAccount(name, token, this.session);
+      const result = await this.api.createAccount(name, token, this.session, pin);
       return result;
     } catch (error) {
       console.error('Failed to create account:', error);

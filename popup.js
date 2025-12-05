@@ -3,6 +3,7 @@
 
 let wallet;
 let currentScreen = 'login';
+let autoRefreshInterval = null;
 
 // Initialize popup
 document.addEventListener('DOMContentLoaded', async () => {
@@ -17,6 +18,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (wallet.isLoggedIn() && !wallet.isLocked) {
     showScreen('wallet');
     loadWalletData();
+    startAutoRefresh();
   } else {
     showScreen('login');
   }
@@ -58,6 +60,7 @@ function setupEventListeners() {
     showScreen('settings');
     loadSettings();
   });
+  document.getElementById('refresh-btn').addEventListener('click', handleRefresh);
 
   // Account address copy
   document.getElementById('account-address').addEventListener('click', copyAddress);
@@ -86,6 +89,12 @@ function setupEventListeners() {
   document.getElementById('back-from-receive-btn').addEventListener('click', () => showScreen('wallet'));
   document.getElementById('copy-address-btn').addEventListener('click', copyReceiveAddress);
   document.getElementById('receive-account-select').addEventListener('change', handleReceiveAccountChange);
+  document.getElementById('create-account-btn').addEventListener('click', () => showScreen('create-account'));
+
+  // Create account screen
+  document.getElementById('back-from-create-account-btn').addEventListener('click', () => showScreen('receive'));
+  document.getElementById('new-account-token-select').addEventListener('change', handleTokenSelectChange);
+  document.getElementById('confirm-create-account-btn').addEventListener('click', handleCreateAccount);
 
   // Settings screen
   document.getElementById('back-from-settings-btn').addEventListener('click', () => showScreen('wallet'));
@@ -228,11 +237,6 @@ async function handleLogin() {
     // Create and save session (locked)
     await wallet.login(username, password, pin);
     
-    // SECURITY: Clear sensitive data immediately after session creation
-    document.getElementById('login-username').value = '';
-    document.getElementById('login-password').value = '';
-    document.getElementById('login-pin').value = '';
-    
     // Move to wallet UI immediately
     showScreen('wallet');
     hideLoading();
@@ -242,11 +246,17 @@ async function handleLogin() {
     try {
       await wallet.unlock(pin);
       await loadWalletData();
+      startAutoRefresh();
     } catch (unlockError) {
       console.error('Failed to unlock session or load data:', unlockError);
       console.error('Error details:', unlockError.message);
       showNotification('Warning: Failed to unlock session - ' + unlockError.message, 'warning');
     }
+    
+    // SECURITY: Clear sensitive data after unlock completes
+    document.getElementById('login-username').value = '';
+    document.getElementById('login-password').value = '';
+    document.getElementById('login-pin').value = '';
   } catch (error) {
     showNotification('Login failed: ' + error.message, 'error');
     hideLoading();
@@ -406,6 +416,44 @@ async function loadTransactions() {
   }
 }
 
+// Manual refresh handler
+async function handleRefresh() {
+  const refreshBtn = document.getElementById('refresh-btn');
+  refreshBtn.classList.add('spinning');
+  
+  try {
+    await loadWalletData();
+    showNotification('Wallet refreshed', 'success');
+  } catch (error) {
+    console.error('Failed to refresh:', error);
+    showNotification('Failed to refresh wallet', 'error');
+  } finally {
+    setTimeout(() => refreshBtn.classList.remove('spinning'), 500);
+  }
+}
+
+// Start auto-refresh (every 30 seconds)
+function startAutoRefresh() {
+  stopAutoRefresh(); // Clear any existing interval
+  autoRefreshInterval = setInterval(async () => {
+    if (currentScreen === 'wallet' && wallet.isLoggedIn() && !wallet.isLocked) {
+      try {
+        await loadWalletData();
+      } catch (error) {
+        console.error('Auto-refresh failed:', error);
+      }
+    }
+  }, 30 * 1000); // 30 seconds
+}
+
+// Stop auto-refresh
+function stopAutoRefresh() {
+  if (autoRefreshInterval) {
+    clearInterval(autoRefreshInterval);
+    autoRefreshInterval = null;
+  }
+}
+
 // Load tokens list with balances
 function loadTokensList(accounts) {
   const container = document.getElementById('tokens-list');
@@ -456,20 +504,81 @@ function createTransactionItem(tx) {
   const div = document.createElement('div');
   div.className = 'transaction-item';
   
-  const type = tx.type || (tx.OP === 'DEBIT' ? 'send' : 'receive');
-  const isReceive = type === 'receive' || tx.OP === 'CREDIT';
-  const amount = tx.amount || 0;
+  // Nexus transactions can have multiple contracts
+  // We need to analyze the contracts to determine the transaction type
+  let txType = 'unknown';
+  let amount = 0;
+  let ticker = 'NXS';
+  let isIncoming = false;
+  
+  if (tx.contracts && tx.contracts.length > 0) {
+    const contract = tx.contracts[0]; // Use first contract for display
+    const op = contract.OP;
+    
+    // Get amount and ticker from contract
+    amount = contract.amount || 0;
+    ticker = contract.ticker || 'NXS';
+    
+    // Determine transaction type based on OP code
+    switch (op) {
+      case 'CREATE':
+        txType = 'Account Created';
+        break;
+      case 'DEBIT':
+        // DEBIT means we sent funds
+        txType = 'Sent';
+        isIncoming = false;
+        break;
+      case 'CREDIT':
+        // CREDIT means we received/claimed funds
+        txType = 'Received';
+        isIncoming = true;
+        break;
+      case 'COINBASE':
+        txType = 'Mining Reward';
+        isIncoming = true;
+        break;
+      case 'GENESIS':
+        txType = 'Genesis';
+        isIncoming = true;
+        break;
+      case 'TRUST':
+        txType = 'Trust';
+        break;
+      case 'STAKE':
+        txType = 'Stake';
+        break;
+      case 'UNSTAKE':
+        txType = 'Unstake';
+        isIncoming = true;
+        break;
+      case 'LEGACY':
+        txType = 'Legacy';
+        break;
+      default:
+        txType = op;
+    }
+  } else {
+    // Fallback to old logic if no contracts
+    const type = tx.type || (tx.OP === 'DEBIT' ? 'send' : 'receive');
+    isIncoming = type === 'receive' || tx.OP === 'CREDIT';
+    amount = tx.amount || 0;
+    txType = isIncoming ? 'Received' : 'Sent';
+  }
+  
+  // Special handling for CREATE operations (no amount display)
+  const showAmount = amount > 0;
   
   div.innerHTML = `
-    <div class="transaction-icon ${isReceive ? 'receive' : 'send'}">
-      ${isReceive ? '↓' : '↑'}
+    <div class="transaction-icon ${isIncoming ? 'receive' : 'send'}">
+      ${isIncoming ? '↓' : '↑'}
     </div>
     <div class="transaction-details">
-      <div class="transaction-type">${isReceive ? 'Received' : 'Sent'}</div>
+      <div class="transaction-type">${txType}</div>
       <div class="transaction-date">${formatDate(tx.timestamp || Date.now())}</div>
     </div>
-    <div class="transaction-amount ${isReceive ? 'positive' : 'negative'}">
-      ${isReceive ? '+' : '-'}${formatAmount(amount)} NXS
+    <div class="transaction-amount ${isIncoming ? 'positive' : 'negative'}">
+      ${showAmount ? (isIncoming ? '+' : '-') + formatAmount(amount) + ' ' + ticker : '—'}
     </div>
   `;
   
@@ -789,6 +898,68 @@ function copyReceiveAddress() {
   showNotification('Address copied to clipboard!', 'success');
 }
 
+// Handle token select change (show/hide custom token input)
+function handleTokenSelectChange() {
+  const select = document.getElementById('new-account-token-select');
+  const customGroup = document.getElementById('custom-token-group');
+  
+  if (select.value === 'custom') {
+    customGroup.classList.remove('hidden');
+  } else {
+    customGroup.classList.add('hidden');
+  }
+}
+
+// Handle create account
+async function handleCreateAccount() {
+  const accountName = document.getElementById('new-account-name').value.trim();
+  const tokenSelect = document.getElementById('new-account-token-select');
+  const customToken = document.getElementById('new-account-token-name').value.trim();
+  const pin = document.getElementById('create-account-pin').value;
+
+  if (!pin) {
+    showNotification('Please enter your PIN', 'error');
+    return;
+  }
+
+  // Determine token address or name
+  let token = '0'; // Default to NXS
+  if (tokenSelect.value === 'custom') {
+    if (!customToken) {
+      showNotification('Please enter a token name or address', 'error');
+      return;
+    }
+    token = customToken;
+  } else {
+    token = tokenSelect.value;
+  }
+
+  showLoading('Creating account...');
+
+  try {
+    const result = await wallet.createAccount(accountName || undefined, token, pin);
+    
+    hideLoading();
+    showNotification('Account created successfully!', 'success');
+    
+    // Clear form
+    document.getElementById('new-account-name').value = '';
+    document.getElementById('new-account-token-select').value = '0';
+    document.getElementById('new-account-token-name').value = '';
+    document.getElementById('create-account-pin').value = '';
+    document.getElementById('custom-token-group').classList.add('hidden');
+    
+    // Refresh wallet data and return to receive screen
+    await loadWalletData();
+    showScreen('receive');
+    await showReceiveAddress();
+  } catch (error) {
+    hideLoading();
+    console.error('Failed to create account:', error);
+    showNotification('Failed to create account: ' + error.message, 'error');
+  }
+}
+
 // Load settings
 async function loadSettings() {
   const walletInfo = wallet.getWalletInfo();
@@ -904,6 +1075,7 @@ async function handleLogout() {
   
   try {
     await wallet.logout();
+    stopAutoRefresh();
     console.log('Logout successful, switching to login screen');
     showScreen('login');
     

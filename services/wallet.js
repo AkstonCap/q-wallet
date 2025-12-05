@@ -255,27 +255,35 @@ class WalletService {
   // Create a new account
   async createAccount(name, token = '0', pin) {
     try {
+      // Check if default account has sufficient balance for fees
+      const nexusFee = 0.01; // Nexus transaction fee (auto-deducted by blockchain)
+      const distordiaFee = 0.01; // Distordia service fee
+      const totalFees = nexusFee + distordiaFee;
+      
+      const nxsBalance = await this.getBalance('default');
+      if (nxsBalance.balance < totalFees) {
+        throw new Error(`Insufficient NXS in default account for fees. Need ${totalFees} NXS (Nexus: ${nexusFee} + Service: ${distordiaFee}).`);
+      }
+      
       // Create the account first
       const result = await this.api.createAccount(name, token, this.session, pin);
       
-      // Charge fees: Nexus transaction fee + Distordia service fee
+      // Charge only Distordia service fee
+      // (Nexus fee of 0.01 NXS is automatically deducted by the blockchain)
       const DISTORDIA_FEE_ADDRESS = '8Csmb3RP227N1NHJDH8QZRjZjobe4udaygp7aNv5VLPWDvLDVD7';
-      const nexusFee = 0.01; // Nexus transaction fee for multiple transactions within 10 seconds
-      const distordiaFee = 0.01; // Distordia service fee for account creation
-      const totalFees = nexusFee + distordiaFee;
       
       try {
         await this.api.debit(
           'default', // Debit from default NXS account
-          totalFees,
+          distordiaFee,
           DISTORDIA_FEE_ADDRESS,
           pin,
-          `Fees: Nexus ${nexusFee} + Service ${distordiaFee}`,
+          'Distordia service fee',
           this.session
         );
-        console.log(`Total fees charged: ${totalFees} NXS (Nexus: ${nexusFee} + Distordia: ${distordiaFee})`);
+        console.log(`Distordia service fee charged: ${distordiaFee} NXS (Nexus tx fee ${nexusFee} NXS auto-deducted by blockchain)`);
       } catch (feeError) {
-        console.error('Failed to charge fees:', feeError);
+        console.error('Failed to charge Distordia service fee:', feeError);
         // Don't fail the account creation if fee payment fails
         // but log it for visibility
       }
@@ -303,15 +311,17 @@ class WalletService {
 
       // Check balance and determine token type
       const accountInfo = await this.getBalance(accountName);
+      const isNXS = accountInfo.token === '0' || accountInfo.token === 'NXS' || !accountInfo.token;
+      
+      // Check if sending account has sufficient balance
       if (parsedAmount > accountInfo.balance) {
         throw new Error('Insufficient balance');
       }
 
-      // Calculate Distordia fee
+      // Calculate fees
       const DISTORDIA_FEE_ADDRESS = '8Csmb3RP227N1NHJDH8QZRjZjobe4udaygp7aNv5VLPWDvLDVD7';
       let distordiaFee = 0;
-      const nexusFee = 0.01; // Nexus transaction fee for multiple transactions within 10 seconds
-      const isNXS = accountInfo.token === '0' || accountInfo.token === 'NXS' || !accountInfo.token;
+      const nexusFee = 0.01; // Nexus transaction fee (automatically deducted by blockchain for 2 tx within 10s)
       
       if (isNXS) {
         // NXS: 0.1% of send amount, minimum 0.000001 (1e-6) NXS
@@ -323,17 +333,10 @@ class WalletService {
       
       const totalFees = distordiaFee + nexusFee;
 
-      // Check if user has sufficient NXS balance for fees (if sending non-NXS token)
-      if (!isNXS) {
-        const nxsBalance = await this.getBalance('default');
-        if (nxsBalance.balance < totalFees) {
-          throw new Error(`Insufficient NXS balance for fees. Need ${totalFees} NXS in default account (Nexus: ${nexusFee} + Service: ${distordiaFee}).`);
-        }
-      } else {
-        // For NXS sends, check if balance covers both amount and fees
-        if (accountInfo.balance < parsedAmount + totalFees) {
-          throw new Error(`Insufficient balance. Need ${parsedAmount + totalFees} NXS (${parsedAmount} + ${totalFees} fees).`);
-        }
+      // Check if default NXS account has sufficient balance for Distordia fee + Nexus fee
+      const nxsBalance = await this.getBalance('default');
+      if (nxsBalance.balance < totalFees) {
+        throw new Error(`Insufficient NXS in default account for fees. Need ${totalFees} NXS (Nexus: ${nexusFee} + Service: ${distordiaFee}).`);
       }
 
       // Send transaction with PIN
@@ -346,20 +349,20 @@ class WalletService {
         this.session
       );
 
-      // Charge Distordia fee + Nexus transaction fee from default NXS account
+      // Charge only Distordia service fee from default NXS account
+      // (Nexus fee of 0.01 NXS is automatically deducted by the blockchain)
       try {
-        const feeAccount = isNXS ? accountName : 'default';
         await this.api.debit(
-          feeAccount,
-          totalFees,
+          'default',
+          distordiaFee,
           DISTORDIA_FEE_ADDRESS,
           pin,
-          `Fees: Nexus ${nexusFee} + Service ${distordiaFee}`,
+          `Distordia service fee`,
           this.session
         );
-        console.log(`Total fees charged: ${totalFees} NXS (Nexus: ${nexusFee} + Distordia: ${distordiaFee})`);
+        console.log(`Distordia service fee charged: ${distordiaFee} NXS (Nexus tx fee ${nexusFee} NXS auto-deducted by blockchain)`);
       } catch (feeError) {
-        console.error('Failed to charge fees:', feeError);
+        console.error('Failed to charge Distordia service fee:', feeError);
         // Main transaction already completed, log fee error but don't fail
       }
 

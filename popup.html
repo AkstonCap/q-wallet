@@ -92,7 +92,10 @@
       <div class="header">
         <div class="header-top">
           <h1>Distordia Q-wallet</h1>
-          <button id="settings-btn" class="icon-btn" title="Settings">⚙️</button>
+          <div class="header-actions">
+            <button id="refresh-btn" class="icon-btn" title="Refresh">🔄</button>
+            <button id="settings-btn" class="icon-btn" title="Settings">⚙️</button>
+          </div>
         </div>
         <div class="account-info">
           <div class="account-name" id="account-name">Default Account</div>
@@ -218,6 +221,39 @@
         <div class="receive-info">
           Share this address to receive tokens
         </div>
+        <button id="create-account-btn" class="btn btn-primary" style="margin-top: 20px;">Create New Account</button>
+      </div>
+    </div>
+
+    <!-- Create Account Screen -->
+    <div id="create-account-screen" class="screen hidden">
+      <div class="header">
+        <button id="back-from-create-account-btn" class="back-btn">← Back</button>
+        <h2>Create New Account</h2>
+      </div>
+      <div class="content">
+        <div class="form-group">
+          <label for="new-account-name">Account Name (Optional)</label>
+          <input type="text" id="new-account-name" placeholder="e.g., savings, trading">
+          <small class="form-hint">Leave empty for unnamed account</small>
+        </div>
+        <div class="form-group">
+          <label for="new-account-token">Token</label>
+          <select id="new-account-token-select" class="account-select">
+            <option value="0">NXS</option>
+            <option value="custom">Custom Token...</option>
+          </select>
+        </div>
+        <div class="form-group hidden" id="custom-token-group">
+          <label for="new-account-token-name">Token Name or Address</label>
+          <input type="text" id="new-account-token-name" placeholder="e.g., BTC or token address">
+          <small class="form-hint">Enter token name (ticker) or Base58 token address</small>
+        </div>
+        <div class="form-group">
+          <label for="create-account-pin">PIN</label>
+          <input type="password" id="create-account-pin" placeholder="Enter PIN" maxlength="8">
+        </div>
+        <button id="confirm-create-account-btn" class="btn btn-primary">Create Account</button>
       </div>
     </div>
 

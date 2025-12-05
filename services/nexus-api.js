@@ -148,24 +148,36 @@ class NexusAPI {
 
   // Create a new account
   async createAccount(name, token = 'NXS', session, pin) {
-    return this.request('finance/create/account', {
-      name,
+    const params = {
       token,
       session,
       pin
-    });
+    };
+    
+    // Only include name if provided
+    if (name) {
+      params.name = name;
+    }
+    
+    return this.request('finance/create/account', params);
   }
 
   // Send NXS or tokens (debit)
   async debit(accountName, amount, recipientAddress, pin, reference = '', session) {
-    return this.request('finance/debit/account', {
+    const params = {
       pin,
       session,
       from: accountName,
       amount: parseFloat(amount),
-      to: recipientAddress,
-      reference
-    });
+      to: recipientAddress
+    };
+    
+    // Only include reference if it's not empty
+    if (reference && reference.trim()) {
+      params.reference = reference;
+    }
+    
+    return this.request('finance/debit/account', params);
   }
 
   // Credit (claim) a debit transaction

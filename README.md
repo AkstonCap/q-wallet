@@ -97,10 +97,38 @@ Before using the wallet, you need a Nexus node running. You can:
 
 #### Send NXS
 1. Click the "Send" button
+#### Send NXS
+1. Click the "Send" button
 2. Enter recipient address or username
 3. Enter amount to send
 4. Add optional reference/memo
-5. Review and confirm transaction
+5. Review transaction summary including fees
+6. Confirm transaction with PIN
+
+**Transaction Fees:**
+- **Nexus Network Fee:** 0.01 NXS (automatically deducted for multiple transactions within 10 seconds)
+- **Distordia Service Fee:** 
+  - For NXS: 0.1% of send amount (minimum 0.000001 NXS)
+  - For other tokens: 0.01 NXS flat fee
+- All fees are deducted from your default NXS account
+
+**Example:** Sending 1 NXS
+- Amount sent: 1 NXS
+- Distordia service fee: 0.001 NXS (0.1%)
+- Nexus network fee: 0.01 NXS (auto-deducted)
+- Total cost: 1.011 NXS
+
+#### Create Accounts
+1. Go to "Receive" screen
+2. Click "Create New Account"
+3. Enter optional account name
+4. Select token (NXS or custom token name/address)
+5. Enter PIN to confirm
+
+**Account Creation Fees:**
+- **Nexus Network Fee:** 0.01 NXS (automatically deducted)
+- **Distordia Service Fee:** 0.01 NXS
+- Total: 0.02 NXS (deducted from default account)
 
 #### View Transactions
 - Check the "Transactions" tab to see your history
@@ -168,6 +196,25 @@ For complete dApp integration documentation, see [DAPP-INTEGRATION.md](DAPP-INTE
 - 🔐 **Session-Based Security** - Session tokens auto-clear when you close your browser
 - 🔑 **PIN Confirmation** - All transactions require PIN re-entry for approval
 - 🌐 **HTTPS Enforcement** - Remote connections must use secure HTTPS protocol
+- 💰 **Transparent Fees** - All transaction and service fees are clearly displayed before confirmation
+
+### Fee Structure
+The wallet implements a two-tier fee system to ensure sustainability and network security:
+
+**Nexus Network Fee (Automatic):**
+- 0.01 NXS per additional transaction within 10 seconds
+- Automatically deducted by the Nexus blockchain
+- Not charged by the wallet, but included in fee estimates
+
+**Distordia Service Fee:**
+- **For NXS sends:** 0.1% of amount (minimum 0.000001 NXS)
+  - Example: 1 NXS = 0.001 NXS fee
+  - Example: 100 NXS = 0.1 NXS fee
+  - Example: 0.001 NXS = 0.000001 NXS fee (minimum)
+- **For token sends:** 0.01 NXS flat fee
+- **For account creation:** 0.01 NXS flat fee
+
+All fees are clearly displayed in the transaction summary before you confirm. Service fees are sent to the Distordia development address to support ongoing wallet development and maintenance.
 
 ### Best Practices
 1. ✅ Use strong, unique passwords (minimum 8 characters)

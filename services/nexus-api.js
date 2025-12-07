@@ -49,7 +49,26 @@ class NexusAPI {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        // Try to get error details from response body
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorMessage = errorData.error.message || JSON.stringify(errorData.error);
+          }
+          console.error('API Error response:', errorData);
+        } catch (e) {
+          // If response isn't JSON, try to get text
+          try {
+            const errorText = await response.text();
+            if (errorText) {
+              errorMessage += ` - ${errorText}`;
+            }
+          } catch (e2) {
+            // Ignore
+          }
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
@@ -132,6 +151,29 @@ class NexusAPI {
     });
     // API returns object directly in result property
     return response.result || response;
+  }
+
+  // Get account by address or name (for validation)
+  async getAccountByAddress(addressOrName) {
+    try {
+      // First try as address
+      try {
+        const response = await this.request('register/get/finance:account', {
+          address: addressOrName
+        });
+        return response.result || response;
+      } catch (addressError) {
+        // If address lookup fails, try as name
+        const response = await this.request('register/get/finance:account', {
+          name: addressOrName
+        });
+        return response.result || response;
+      }
+    } catch (error) {
+      // Return null if neither address nor name lookup succeeds
+      console.log('Account lookup failed for:', addressOrName);
+      return null;
+    }
   }
 
   // List all accounts

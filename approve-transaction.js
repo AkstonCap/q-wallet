@@ -10,19 +10,49 @@ document.addEventListener('DOMContentLoaded', () => {
   const params = new URLSearchParams(window.location.search);
   requestId = params.get('requestId');
   
+  const refParam = params.get('reference');
   transactionData = {
     origin: params.get('origin'),
     from: params.get('from'),
     to: params.get('to'),
-    amount: params.get('amount'),
-    reference: params.get('reference') || 'None'
+    amount: params.get('amount')
   };
+  
+  // Only include reference if it has a value
+  if (refParam && refParam.trim() && refParam !== 'None') {
+    transactionData.reference = refParam.trim();
+  }
   
   // Display transaction details
   displayTransactionDetails();
   
   // Setup event listeners
   setupEventListeners();
+  
+  // Listen for transaction result from background
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log('=== Message received in approval popup ===');
+    console.log('Message type:', message.type);
+    console.log('Message requestId:', message.requestId);
+    console.log('Current requestId:', requestId);
+    console.log('Full message:', message);
+    
+    if (message.type === 'TRANSACTION_RESULT' && message.requestId === requestId) {
+      console.log('Transaction result received:', message);
+      hideLoading();
+      
+      if (message.success) {
+        console.log('Showing success with result:', message.result);
+        showSuccess(message.result);
+      } else {
+        console.log('Showing error:', message.error);
+        showError(message.error || 'Transaction failed');
+      }
+      
+      sendResponse({ received: true });
+    }
+    return true;
+  });
   
   // Focus PIN input
   document.getElementById('pin-input').focus();
@@ -34,7 +64,7 @@ function displayTransactionDetails() {
   document.getElementById('from-account').textContent = transactionData.from || 'default';
   document.getElementById('to-address').textContent = truncateAddress(transactionData.to);
   document.getElementById('amount').textContent = `${transactionData.amount} NXS`;
-  document.getElementById('reference').textContent = transactionData.reference;
+  document.getElementById('reference').textContent = transactionData.reference || 'None';
 }
 
 // Truncate long addresses for display
@@ -47,10 +77,12 @@ function truncateAddress(address) {
 function setupEventListeners() {
   const approveBtn = document.getElementById('approve-btn');
   const denyBtn = document.getElementById('deny-btn');
+  const closeBtn = document.getElementById('close-btn');
   const pinInput = document.getElementById('pin-input');
   
   approveBtn.addEventListener('click', handleApprove);
   denyBtn.addEventListener('click', handleDeny);
+  closeBtn.addEventListener('click', () => window.close());
   
   // Enable approve button only when PIN is entered
   pinInput.addEventListener('input', () => {
@@ -77,6 +109,12 @@ async function handleApprove() {
   const pinInput = document.getElementById('pin-input');
   const pin = pinInput.value.trim();
   
+  console.log('=== handleApprove called ===');
+  console.log('PIN present:', !!pin);
+  console.log('PIN length:', pin ? pin.length : 0);
+  console.log('RequestId:', requestId);
+  console.log('TransactionData:', transactionData);
+  
   if (!pin || pin.length < 4) {
     alert('Please enter a valid PIN (at least 4 digits)');
     return;
@@ -86,8 +124,9 @@ async function handleApprove() {
   showLoading();
   
   try {
+    console.log('Sending TRANSACTION_APPROVAL_RESPONSE message...');
     // Send approval response to background script
-    await chrome.runtime.sendMessage({
+    const response = await chrome.runtime.sendMessage({
       type: 'TRANSACTION_APPROVAL_RESPONSE',
       requestId: requestId,
       approved: true,
@@ -95,12 +134,12 @@ async function handleApprove() {
       transactionData: transactionData
     });
     
-    // Close window
-    window.close();
+    console.log('Message sent successfully, response:', response);
+    console.log('Waiting for transaction result...');
   } catch (error) {
     console.error('Failed to send approval:', error);
     hideLoading();
-    alert('Failed to process approval. Please try again.');
+    showError('Failed to process approval. Please try again.');
   }
 }
 
@@ -135,4 +174,54 @@ function hideLoading() {
   document.querySelector('.content').style.display = 'block';
   document.querySelector('.buttons').style.display = 'flex';
   document.getElementById('loading').classList.remove('active');
+}
+
+// Show success result
+function showSuccess(result) {
+  const resultDiv = document.getElementById('result');
+  const resultTitle = document.getElementById('result-title');
+  const resultMessage = document.getElementById('result-message');
+  const resultData = document.getElementById('result-data');
+  const closeBtn = document.getElementById('close-btn');
+  
+  resultTitle.textContent = '✅ Transaction Successful';
+  resultTitle.style.color = '#4caf50';
+  
+  // Extract txid from various possible response structures
+  const txid = result?.txid || result?.result?.txid || result?.hash;
+  
+  if (txid) {
+    resultMessage.textContent = 'Transaction ID:';
+    resultData.textContent = txid;
+    resultData.style.display = 'block';
+  } else {
+    resultMessage.textContent = 'Transaction completed successfully';
+    resultData.textContent = JSON.stringify(result, null, 2);
+    resultData.style.display = 'block';
+  }
+  
+  resultDiv.classList.add('active');
+  closeBtn.focus();
+  
+  // Auto-close after 10 seconds
+  setTimeout(() => {
+    window.close();
+  }, 10000);
+}
+
+// Show error result
+function showError(error) {
+  const resultDiv = document.getElementById('result');
+  const resultTitle = document.getElementById('result-title');
+  const resultMessage = document.getElementById('result-message');
+  const resultData = document.getElementById('result-data');
+  const closeBtn = document.getElementById('close-btn');
+  
+  resultTitle.textContent = '❌ Transaction Failed';
+  resultTitle.style.color = '#f44336';
+  resultMessage.textContent = error;
+  resultData.style.display = 'none';
+  
+  resultDiv.classList.add('active');
+  closeBtn.focus();
 }

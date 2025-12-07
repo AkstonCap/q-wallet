@@ -427,6 +427,31 @@ body {
   color: var(--text-secondary);
 }
 
+.validation-message {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  min-height: 18px;
+}
+
+.validation-message.success {
+  color: var(--success-color);
+}
+
+.validation-message.error {
+  color: var(--danger-color);
+}
+
+.validation-message.warning {
+  color: var(--warning-color);
+}
+
+.validation-message.checking {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
 .amount-input {
   position: relative;
 }

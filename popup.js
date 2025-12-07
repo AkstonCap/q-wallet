@@ -75,6 +75,7 @@ function setupEventListeners() {
   document.getElementById('confirm-send-btn').addEventListener('click', handleSend);
   document.getElementById('send-amount').addEventListener('input', updateTransactionSummary);
   document.getElementById('send-from-account').addEventListener('change', handleAccountChange);
+  document.getElementById('send-to').addEventListener('input', debounce(validateRecipient, 500));
 
   // PIN confirmation modal
   document.getElementById('cancel-transaction-btn').addEventListener('click', closePinModal);
@@ -585,6 +586,59 @@ function createTransactionItem(tx) {
   return div;
 }
 
+// Validate recipient address or username
+async function validateRecipient() {
+  const recipientInput = document.getElementById('send-to').value.trim();
+  const validationMessage = document.getElementById('recipient-validation');
+  const fromAccountSelect = document.getElementById('send-from-account');
+  
+  // Clear validation if input is empty
+  if (!recipientInput) {
+    validationMessage.textContent = '';
+    validationMessage.className = 'validation-message';
+    return;
+  }
+  
+  // Get sender's token type
+  const selectedOption = fromAccountSelect.options[fromAccountSelect.selectedIndex];
+  const senderToken = selectedOption?.dataset.token || '0';
+  
+  validationMessage.textContent = 'Checking...';
+  validationMessage.className = 'validation-message checking';
+  
+  try {
+    // Try to get account by address/name
+    const recipientAccount = await wallet.api.getAccountByAddress(recipientInput);
+    
+    if (!recipientAccount) {
+      validationMessage.textContent = '⚠ Account not found';
+      validationMessage.className = 'validation-message error';
+      return;
+    }
+    
+    // Check if token types match
+    const recipientToken = recipientAccount.token || '0';
+    
+    if (senderToken !== recipientToken) {
+      const senderTokenName = senderToken === '0' ? 'NXS' : senderToken;
+      const recipientTokenName = recipientToken === '0' ? 'NXS' : recipientToken;
+      validationMessage.textContent = `✗ Token mismatch: sending ${senderTokenName} to ${recipientTokenName} account`;
+      validationMessage.className = 'validation-message error';
+      return;
+    }
+    
+    // Valid recipient
+    const tokenName = recipientToken === '0' ? 'NXS' : (recipientAccount.ticker || 'token');
+    validationMessage.textContent = `✓ Valid ${tokenName} account`;
+    validationMessage.className = 'validation-message success';
+    
+  } catch (error) {
+    console.error('Recipient validation error:', error);
+    validationMessage.textContent = '⚠ Unable to validate';
+    validationMessage.className = 'validation-message warning';
+  }
+}
+
 // Handle send transaction
 async function handleSend() {
   const accountName = document.getElementById('send-from-account').value;
@@ -604,6 +658,31 @@ async function handleSend() {
 
   if (parseFloat(amount) <= 0) {
     showNotification('Amount must be greater than 0', 'error');
+    return;
+  }
+
+  // Validate recipient account before proceeding
+  const validationMessage = document.getElementById('recipient-validation');
+  const validationClass = validationMessage.className;
+  
+  // Check if validation has run and was successful
+  if (!validationClass.includes('success')) {
+    if (validationClass.includes('error')) {
+      showNotification('Invalid recipient account. Please check the address or name.', 'error');
+    } else if (validationClass.includes('warning')) {
+      showNotification('Unable to validate recipient account. Please verify and try again.', 'error');
+    } else {
+      // Validation hasn't run yet, trigger it and wait
+      showNotification('Validating recipient account...', 'info');
+      await validateRecipient();
+      
+      // Re-check validation result
+      const newValidationClass = document.getElementById('recipient-validation').className;
+      if (!newValidationClass.includes('success')) {
+        showNotification('Invalid recipient account. Please check the address or name.', 'error');
+        return;
+      }
+    }
     return;
   }
 
@@ -747,6 +826,7 @@ async function populateSendAccounts() {
       option.dataset.balance = account.balance || 0;
       option.dataset.ticker = account.ticker || 'Unknown';
       option.dataset.decimals = account.decimals || 6;
+      option.dataset.token = account.token || '0'; // Store token address for validation
       select.appendChild(option);
     });
     
@@ -1209,4 +1289,17 @@ function formatDate(timestamp) {
   if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
   
   return date.toLocaleDateString();
+}
+
+// Debounce utility function
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
 }

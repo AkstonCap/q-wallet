@@ -7,6 +7,7 @@ importScripts('services/nexus-api.js', 'services/storage.js', 'services/wallet.j
 let wallet;
 const pendingApprovals = new Map(); // Store pending connection approval requests
 const pendingTransactionApprovals = new Map(); // Store pending transaction approval requests
+const recentTransactionRequests = new Map(); // Track recent transaction requests to prevent duplicates
 
 // Initialize on install
 chrome.runtime.onInstalled.addListener(async () => {
@@ -24,6 +25,13 @@ chrome.runtime.onStartup.addListener(async () => {
 
 // Handle messages from popup and content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  console.log('=== Message received in background ===');
+  console.log('Message type:', request.type);
+  console.log('Message method:', request.method);
+  console.log('Sender tab:', sender.tab?.id);
+  console.log('Sender URL:', sender.url);
+  console.log('Full request:', request);
+  
   // Handle connection approval responses
   if (request.type === 'CONNECTION_RESPONSE') {
     const { requestId, approved, blocked, origin } = request;
@@ -56,25 +64,38 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Handle transaction approval responses
   if (request.type === 'TRANSACTION_APPROVAL_RESPONSE') {
     const { requestId, approved, pin, transactionData } = request;
-    console.log('Transaction approval response received:', { requestId, approved });
+    console.log('=== TRANSACTION_APPROVAL_RESPONSE received ===');
+    console.log('RequestId:', requestId);
+    console.log('Approved:', approved);
+    console.log('Has PIN:', !!pin);
+    console.log('TransactionData:', transactionData);
+    console.log('Pending approvals map size:', pendingTransactionApprovals.size);
+    console.log('Pending approvals has this requestId:', pendingTransactionApprovals.has(requestId));
     
     const pending = pendingTransactionApprovals.get(requestId);
     if (pending) {
-      // Resolve the promise with approval status and PIN
-      pending.resolve({ approved, pin, transactionData });
+      console.log('Found pending approval, resolving...');
+      // Resolve the promise with approval status, PIN, and window info
+      pending.resolve({ 
+        approved, 
+        pin, 
+        transactionData,
+        requestId: pending.requestId,
+        windowId: pending.windowId
+      });
       pendingTransactionApprovals.delete(requestId);
+      console.log('Pending approval resolved and deleted');
       
-      // Close the window
-      if (pending.windowId) {
-        chrome.windows.remove(pending.windowId).catch(() => {});
-      }
+      // Don't close the window yet - wait for transaction result to be displayed
+    } else {
+      console.error('No pending approval found for requestId:', requestId);
     }
     
     sendResponse({ success: true });
-    return true;
+    return true; // Early return - don't process this message further
   }
   
-  // Handle normal messages
+  // Handle normal messages (only if not already handled above)
   handleMessage(request, sender)
     .then(sendResponse)
     .catch(error => {
@@ -89,6 +110,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Message handler
 async function handleMessage(request, sender) {
   const { method, params } = request;
+  
+  // Guard against messages without method (e.g., internal extension messages)
+  if (!method) {
+    console.warn('Message received without method property:', request);
+    return { error: 'No method specified' };
+  }
 
   if (!wallet) {
     wallet = new WalletService();
@@ -166,6 +193,9 @@ async function handleMessage(request, sender) {
       return await handleSignTransaction(params);
     
     case 'dapp.sendTransaction':
+      console.log('=== dapp.sendTransaction case triggered ===');
+      console.log('Sender:', sender);
+      console.log('Params:', params);
       await checkDAppPermission(params.origin);
       if (!wallet.isLoggedIn()) {
         throw new Error('Wallet not connected');
@@ -201,6 +231,13 @@ async function checkDAppPermission(origin) {
 // Handle DApp connection request
 async function handleDAppConnection(sender, params) {
   const { origin } = params;
+  
+  console.log('=== handleDAppConnection called ===');
+  console.log('Origin:', origin);
+  console.log('Wallet exists:', !!wallet);
+  console.log('Wallet isLoggedIn:', wallet ? wallet.isLoggedIn() : 'N/A');
+  console.log('Wallet session:', wallet?.session);
+  console.log('Wallet username:', wallet?.username);
   
   if (!wallet.isLoggedIn()) {
     throw new Error('Wallet not connected. Please log in first.');
@@ -303,38 +340,113 @@ async function requestUserApproval(origin) {
 async function handleDAppTransaction(params) {
   const { origin, from, to, amount, reference } = params;
   
+  console.log('=== handleDAppTransaction called ===');
+  console.log('Params:', { origin, from, to, amount, reference });
+  
+  // Create a unique key for this transaction request to prevent duplicates
+  const requestKey = `${origin}:${from}:${to}:${amount}:${reference}`;
+  const now = Date.now();
+  
+  // Check if we've seen this exact request in the last 500ms
+  if (recentTransactionRequests.has(requestKey)) {
+    const lastTime = recentTransactionRequests.get(requestKey);
+    if (now - lastTime < 500) {
+      console.warn('Duplicate transaction request detected and ignored:', requestKey);
+      throw new Error('Duplicate request detected');
+    }
+  }
+  
+  // Track this request
+  recentTransactionRequests.set(requestKey, now);
+  
+  // Clean up old entries after 1 second
+  setTimeout(() => {
+    if (recentTransactionRequests.get(requestKey) === now) {
+      recentTransactionRequests.delete(requestKey);
+    }
+  }, 1000);
+  
   // Request user approval via popup
+  console.log('Requesting transaction approval...');
   const approval = await requestTransactionApproval({
     origin,
     from: from || 'default',
     to,
     amount,
-    reference: reference || ''
+    reference: (reference && reference.trim()) ? reference.trim() : undefined
   });
   
+  console.log('=== Approval received ===');
+  console.log('Approval:', approval);
+  
   if (!approval.approved) {
+    console.log('Transaction was rejected by user');
     throw new Error('Transaction rejected by user');
   }
   
   if (!approval.pin) {
+    console.log('ERROR: No PIN in approval');
     throw new Error('PIN is required for transaction');
   }
   
+  console.log('=== Executing transaction ===');
+  console.log('From:', approval.transactionData.from);
+  console.log('Amount:', approval.transactionData.amount);
+  console.log('To:', approval.transactionData.to);
+  console.log('Reference:', approval.transactionData.reference);
+  console.log('Wallet session:', wallet.session);
+  console.log('Wallet isLocked:', wallet.isLocked);
+  
+  // Verify wallet state
+  if (!wallet.session) {
+    throw new Error('Wallet session not available. Please log in again.');
+  }
+  
   // Execute transaction with user-provided PIN
+  let result;
+  let error;
+  
   try {
-    const result = await wallet.send(
+    console.log('Calling wallet.send()...');
+    result = await wallet.send(
       approval.transactionData.from,
       approval.transactionData.amount,
       approval.transactionData.to,
       approval.pin,
-      approval.transactionData.reference
+      approval.transactionData.reference || undefined
     );
-    
-    return { result };
-  } catch (error) {
-    console.error('Transaction failed:', error);
-    throw new Error('Transaction failed: ' + error.message);
+    console.log('=== Transaction successful ===');
+    console.log('Result:', result);
+  } catch (err) {
+    console.error('=== Transaction failed ===');
+    console.error('Error:', err);
+    console.error('Error message:', err.message);
+    console.error('Error stack:', err.stack);
+    error = err.message;
   }
+  
+  // Send result back to popup window using runtime.sendMessage (broadcasts to all contexts)
+  if (approval.requestId) {
+    console.log('Broadcasting transaction result:', { requestId: approval.requestId, success: !error });
+    chrome.runtime.sendMessage({
+      type: 'TRANSACTION_RESULT',
+      requestId: approval.requestId,
+      success: !error,
+      result: result,
+      error: error
+    }).catch((err) => {
+      console.log('Could not broadcast result:', err.message);
+    });
+    
+    // Give popup time to receive and display the result before potential window close
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  
+  if (error) {
+    throw new Error('Transaction failed: ' + error);
+  }
+  
+  return { result };
 }
 
 // Request user approval for dApp transaction
@@ -343,11 +455,18 @@ async function requestTransactionApproval(transactionData) {
     const requestId = Date.now().toString();
     console.log('Requesting transaction approval:', transactionData, 'requestId:', requestId);
     
+    // Check if there's already a pending request (prevent duplicates)
+    if (pendingTransactionApprovals.has(requestId)) {
+      console.warn('Duplicate transaction approval request ignored:', requestId);
+      return pendingTransactionApprovals.get(requestId);
+    }
+    
     // Store the pending request
     pendingTransactionApprovals.set(requestId, { 
       transactionData, 
       resolve, 
-      reject 
+      reject,
+      requestId  // Store requestId for later reference
     });
     
     // Create popup window for approval

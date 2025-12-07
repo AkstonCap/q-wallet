@@ -23,6 +23,11 @@
     // Only handle nexus provider messages
     if (event.data.type && event.data.type === 'NEXUS_PROVIDER_REQUEST') {
       const { id, method, params } = event.data;
+      
+      console.log('=== Content script received NEXUS_PROVIDER_REQUEST ===');
+      console.log('ID:', id);
+      console.log('Method:', method);
+      console.log('Params:', params);
 
       try {
         // Check if extension context is valid
@@ -38,6 +43,9 @@
             origin: window.location.origin
           }
         });
+        
+        console.log('=== Content script received response from background ===');
+        console.log('Response:', response);
 
         // Send response back to page
         window.postMessage({

@@ -100,6 +100,7 @@ function setupEventListeners() {
   // Settings screen
   document.getElementById('back-from-settings-btn').addEventListener('click', () => showScreen('wallet'));
   document.getElementById('save-node-btn').addEventListener('click', handleSaveNode);
+  document.getElementById('revoke-all-btn').addEventListener('click', handleRevokeAllConnections);
   // Lock wallet button is commented out in HTML
   // document.getElementById('lock-wallet-btn').addEventListener('click', handleLockWallet);
   document.getElementById('logout-btn').addEventListener('click', handleLogout);
@@ -1100,11 +1101,16 @@ async function loadConnectedSites() {
   const storage = new StorageService();
   const approvedDomains = await storage.getApprovedDomains();
   const container = document.getElementById('connected-sites-list');
+  const revokeAllBtn = document.getElementById('revoke-all-btn');
   
   if (!approvedDomains || approvedDomains.length === 0) {
     container.innerHTML = '<div class="empty-state">No sites connected</div>';
+    revokeAllBtn.style.display = 'none';
     return;
   }
+  
+  // Show Revoke All button when there are connected sites
+  revokeAllBtn.style.display = 'block';
   
   container.innerHTML = '';
   
@@ -1112,16 +1118,29 @@ async function loadConnectedSites() {
     const item = document.createElement('div');
     item.className = 'connected-site-item';
     
+    // Format the domain to show just the hostname
+    const displayDomain = domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    
+    console.log('Creating site item for:', domain, 'Display:', displayDomain);
+    
     item.innerHTML = `
       <div class="connected-site-info">
-        <div class="connected-site-domain">${domain}</div>
-        <div class="connected-site-status">✓ Connected</div>
+        <div class="connected-site-icon">🌐</div>
+        <div class="connected-site-details">
+          <div class="connected-site-domain">${displayDomain}</div>
+          <div class="connected-site-url">${domain}</div>
+        </div>
       </div>
-      <button class="btn btn-danger revoke-btn" data-domain="${domain}">Revoke</button>
+      <button class="revoke-icon-btn" data-domain="${domain}" title="Revoke access">🗑️</button>
     `;
     
+    console.log('Item HTML:', item.innerHTML);
+    
     // Add revoke button handler
-    item.querySelector('.revoke-btn').addEventListener('click', () => handleRevokeConnection(domain));
+    item.querySelector('.revoke-icon-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleRevokeConnection(domain);
+    });
     
     container.appendChild(item);
   });
@@ -1141,6 +1160,31 @@ async function handleRevokeConnection(domain) {
   } catch (error) {
     console.error('Failed to revoke connection:', error);
     showNotification('Failed to revoke connection', 'error');
+  }
+}
+
+// Handle revoke all connections
+async function handleRevokeAllConnections() {
+  const storage = new StorageService();
+  const approvedDomains = await storage.getApprovedDomains();
+  
+  if (!approvedDomains || approvedDomains.length === 0) {
+    return;
+  }
+  
+  if (!confirm(`Are you sure you want to revoke access for all ${approvedDomains.length} connected site(s)?`)) {
+    return;
+  }
+  
+  try {
+    for (const domain of approvedDomains) {
+      await storage.removeApprovedDomain(domain);
+    }
+    showNotification('All connections revoked successfully', 'success');
+    await loadConnectedSites();
+  } catch (error) {
+    console.error('Failed to revoke all connections:', error);
+    showNotification('Failed to revoke all connections', 'error');
   }
 }
 
@@ -1196,6 +1240,17 @@ async function handleLogout() {
   console.log('Attempting logout...');
   
   try {
+    // Revoke all dApp connections before logging out
+    const storage = new StorageService();
+    const approvedDomains = await storage.getApprovedDomains();
+    if (approvedDomains && approvedDomains.length > 0) {
+      console.log(`Revoking ${approvedDomains.length} dApp connection(s)...`);
+      for (const domain of approvedDomains) {
+        await storage.removeApprovedDomain(domain);
+      }
+      console.log('All dApp connections revoked');
+    }
+    
     await wallet.logout();
     stopAutoRefresh();
     console.log('Logout successful, switching to login screen');

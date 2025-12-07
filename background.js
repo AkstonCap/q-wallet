@@ -664,7 +664,22 @@ async function cleanupSession(reason = 'unknown') {
   try {
     const storage = new StorageService();
     
-    // Step 1: Terminate session on blockchain node (if logged in)
+    // Step 1: Revoke all dApp connections
+    try {
+      const approvedDomains = await storage.getApprovedDomains();
+      if (approvedDomains && approvedDomains.length > 0) {
+        console.log(`Revoking ${approvedDomains.length} dApp connection(s) on ${reason}...`);
+        for (const domain of approvedDomains) {
+          await storage.removeApprovedDomain(domain);
+        }
+        console.log('All dApp connections revoked');
+      }
+    } catch (error) {
+      console.error('Failed to revoke dApp connections:', error);
+      // Continue with other cleanup steps
+    }
+    
+    // Step 2: Terminate session on blockchain node (if logged in)
     if (wallet && wallet.isLoggedIn()) {
       try {
         const sessionInfo = wallet.getSessionInfo();
@@ -680,10 +695,10 @@ async function cleanupSession(reason = 'unknown') {
       }
     }
     
-    // Step 2: Securely clear session from storage
+    // Step 3: Securely clear session from storage
     await storage.clearSession();
     
-    // Step 3: Clear any remaining session-prefixed data (fallback mode)
+    // Step 4: Clear any remaining session-prefixed data (fallback mode)
     if (!storage.useSessionAPI) {
       await storage.clearAllSessionData();
     }

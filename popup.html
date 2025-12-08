@@ -44,45 +44,10 @@
           </div>
           <button id="login-btn" class="btn btn-primary">Unlock Wallet</button>
           <div class="divider">or</div>
-          <button id="show-create-btn" class="btn btn-secondary">Create New Wallet</button>
-        </div>
-
-        <div id="create-form" class="form-container hidden">
-          <h2>Create New Wallet</h2>
-          <div class="form-group">
-            <label for="create-api-service">API Service</label>
-            <select id="create-api-service" class="api-select">
-              <option value="https://api.distordia.com">https://api.distordia.com</option>
-              <option value="http://localhost:8080">http://localhost:8080</option>
-              <option value="custom">Custom URL...</option>
-            </select>
+          <div class="create-wallet-link">
+            <p>Don't have a Nexus SigChain yet?</p>
+            <a href="https://nexus.io/wallet" target="_blank" class="btn btn-link">Create SigChain in the Nexus.io official desktop wallet</a>
           </div>
-          <div class="form-group hidden" id="create-custom-api-group">
-            <label for="create-custom-api">Custom API URL</label>
-            <input type="text" id="create-custom-api" placeholder="http://your-node:8080">
-          </div>
-          <div class="form-group">
-            <label for="create-username">Username</label>
-            <input type="text" id="create-username" placeholder="Choose username" autocomplete="off">
-          </div>
-          <div class="form-group">
-            <label for="create-password">Password</label>
-            <input type="password" id="create-password" placeholder="Choose password (min 8 chars)" autocomplete="new-password">
-          </div>
-          <div class="form-group">
-            <label for="create-password-confirm">Confirm Password</label>
-            <input type="password" id="create-password-confirm" placeholder="Confirm password" autocomplete="new-password">
-          </div>
-          <div class="form-group">
-            <label for="create-pin">PIN</label>
-            <input type="password" id="create-pin" placeholder="Choose PIN (4-8 digits)" maxlength="8">
-          </div>
-          <div class="form-group">
-            <label for="create-pin-confirm">Confirm PIN</label>
-            <input type="password" id="create-pin-confirm" placeholder="Confirm PIN" maxlength="8">
-          </div>
-          <button id="create-btn" class="btn btn-primary">Create Wallet</button>
-          <button id="back-to-login-btn" class="btn btn-secondary">Back to Login</button>
         </div>
       </div>
     </div>
@@ -313,7 +278,7 @@
           <h3>About</h3>
           <div class="settings-item">
             <span>Version</span>
-            <span>0.1.3</span>
+            <span>0.1.4</span>
           </div>
         </div>
       </div>

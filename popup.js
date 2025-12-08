@@ -31,21 +31,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 function setupEventListeners() {
   // API service selectors
   document.getElementById('login-api-service').addEventListener('change', handleLoginApiChange);
-  document.getElementById('create-api-service').addEventListener('change', handleCreateApiChange);
   
   // Login form
   document.getElementById('login-btn').addEventListener('click', handleLogin);
-  document.getElementById('show-create-btn').addEventListener('click', () => {
-    document.getElementById('login-form').classList.add('hidden');
-    document.getElementById('create-form').classList.remove('hidden');
-  });
-
-  // Create wallet form
-  document.getElementById('create-btn').addEventListener('click', handleCreateWallet);
-  document.getElementById('back-to-login-btn').addEventListener('click', () => {
-    document.getElementById('create-form').classList.add('hidden');
-    document.getElementById('login-form').classList.remove('hidden');
-  });
 
   // Wallet screen
   document.getElementById('send-btn').addEventListener('click', async () => {

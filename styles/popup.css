@@ -537,6 +537,33 @@ body {
   font-size: 12px;
 }
 
+.create-wallet-link {
+  text-align: center;
+  margin-top: 16px;
+}
+
+.create-wallet-link p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.btn-link {
+  display: inline-block;
+  width: auto;
+  padding: 10px 20px;
+  background: transparent;
+  color: var(--primary-color);
+  border: 1px solid var(--primary-color);
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.btn-link:hover {
+  background: var(--primary-color);
+  color: white;
+}
+
 /* Transaction Summary */
 .transaction-summary {
   background: var(--surface);

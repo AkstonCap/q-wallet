@@ -4,8 +4,20 @@ npm-debug.log
 yarn-error.log
 package-lock.json
 
-# Build outputs
+# Expo / React Native
+.expo/
+.expo-shared/
 dist/
+web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+.metro-health-check*
+
+# Build outputs
 build/
 *.zip
 
@@ -35,7 +47,7 @@ tmp/
 temp/
 *.tmp
 
-# Extension packages
+# Extension packages (legacy)
 *.crx
 *.xpi
 *.pem

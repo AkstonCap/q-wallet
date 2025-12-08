@@ -1,151 +1,254 @@
-# dApp Developer Guide
+# Mobile Wallet Developer Guide
 
-## Quick Start for Building Nexus dApps
+## Development Setup
 
-This guide will help you integrate Q-Wallet into your decentralized application (dApp) to enable Nexus blockchain interactions.
+This guide will help you set up and contribute to the Q-Wallet mobile application.
 
 ## Prerequisites
 
-- Basic knowledge of JavaScript and async/await
-- A web application or website
-- Q-Wallet extension installed for testing
+- Node.js 18+ and npm
+- Git
+- Expo CLI (`npm install -g expo-cli`)
+- For iOS development: Mac with Xcode
+- For Android development: Android Studio
 
-## Integration in 5 Minutes
+## Development Environment Setup
 
-### Step 1: Check for Wallet
+### Step 1: Clone and Install
 
-```javascript
-// Check if Q-Wallet is installed
-if (typeof window.nexus === 'undefined') {
-  alert('Please install Q-Wallet extension');
-  // Show installation instructions
-  return;
-}
+```bash
+# Clone the repository
+git clone https://github.com/AkstonCap/q-wallet.git
+cd q-mobile
+
+# Install dependencies
+npm install
 ```
 
-### Step 2: Request Connection
+### Step 2: Start Development Server
 
-```javascript
-async function connectWallet() {
-  try {
-    const accounts = await window.nexus.connect();
-    console.log('Connected to account:', accounts[0]);
-    return accounts[0];
-  } catch (error) {
-    console.error('Connection denied:', error);
-    return null;
-  }
-}
+```bash
+# Start Expo development server
+npm start
+
+# This will open Expo DevTools in your browser
 ```
 
-### Step 3: Get Balance
+### Step 3: Run on Device/Simulator
 
-```javascript
-async function checkBalance() {
-  try {
-    const balance = await window.nexus.getBalance('default');
-    console.log('Balance:', balance, 'NXS');
-    return balance;
-  } catch (error) {
-    console.error('Failed to get balance:', error);
-    return 0;
-  }
-}
+**iOS Simulator (Mac only):**
+```bash
+npm run ios
 ```
 
-### Step 4: Send Transaction
-
-```javascript
-async function sendNXS(recipient, amount) {
-  try {
-    const result = await window.nexus.sendTransaction({
-      from: 'default',
-      to: recipient,
-      amount: amount,
-      reference: 'Payment from my dApp'
-    });
-    console.log('Transaction sent:', result.txid);
-    return result;
-  } catch (error) {
-    console.error('Transaction failed:', error);
-    throw error;
-  }
-}
+**Android Emulator:**
+```bash
+npm run android
 ```
 
-## Complete Example dApp
+**Physical Device:**
 
-Here's a complete minimal dApp:
 
-```html
-<!DOCTYPE html>
-<html>
-<head>
-  <title>My Nexus dApp</title>
-  <style>
-    body { font-family: Arial; padding: 20px; }
-    button { padding: 10px 20px; margin: 5px; cursor: pointer; }
-    .info { background: #f0f0f0; padding: 10px; margin: 10px 0; }
-  </style>
-</head>
-<body>
-  <h1>My Nexus dApp</h1>
-  
-  <div id="wallet-status">
-    <button id="connectBtn">Connect Wallet</button>
-  </div>
-  
-  <div id="wallet-info" style="display: none;">
-    <div class="info">
-      <strong>Account:</strong> <span id="account"></span><br>
-      <strong>Balance:</strong> <span id="balance"></span> NXS
-    </div>
-    
-    <h3>Send NXS</h3>
-    <input id="recipient" placeholder="Recipient address">
-    <input id="amount" placeholder="Amount" type="number">
-    <button id="sendBtn">Send</button>
-  </div>
+## Project Architecture
 
-  <script>
-    let currentAccount = null;
+### Directory Structure
 
-    // Initialize
-    window.addEventListener('load', async () => {
-      if (typeof window.nexus === 'undefined') {
-        alert('Please install Q-Wallet');
-        return;
-      }
+```
+src/
+├── screens/              # React Native screen components
+│   ├── LoginScreen.js
+│   ├── WalletScreen.js
+│   ├── SendScreen.js
+│   ├── ReceiveScreen.js
+│   ├── SettingsScreen.js
+│   ├── CreateAccountScreen.js
+│   └── TransactionApprovalScreen.js
+├── services/             # Business logic and API services
+│   ├── nexus-api.js     # Nexus blockchain API client
+│   ├── storage.js       # Storage service (AsyncStorage + SecureStore)
+│   └── wallet.js        # Wallet service (high-level wallet operations)
+└── styles/
+    └── common.js         # Shared styles and theme
+```
 
-      // Check if already connected
-      const accounts = await window.nexus.getAccounts();
-      if (accounts.length > 0) {
-        onConnected(accounts[0]);
-      }
+### Service Layer
 
-      // Connect button
-      document.getElementById('connectBtn').onclick = async () => {
-        try {
-          const accounts = await window.nexus.connect();
-          onConnected(accounts[0]);
-        } catch (error) {
-          alert('Connection denied');
-        }
-      };
+**nexus-api.js**: Handles all Nexus blockchain API calls
+- Session management (login/logout)
+- Account operations (get, list, create)
+- Transactions (send, receive, history)
+- Balance queries
 
-      // Send button
-      document.getElementById('sendBtn').onclick = sendTransaction;
-    });
+**storage.js**: Manages persistent and secure storage
+- Uses AsyncStorage for non-sensitive data
+- Uses SecureStore for sensitive data (session tokens, credentials)
+- Provides wallet-specific storage methods
 
-    async function onConnected(account) {
-      currentAccount = account;
-      document.getElementById('wallet-status').style.display = 'none';
-      document.getElementById('wallet-info').style.display = 'block';
-      document.getElementById('account').textContent = account;
-      
-      // Get balance
-      const balance = await window.nexus.getBalance('default');
-      document.getElementById('balance').textContent = balance;
+**wallet.js**: High-level wallet service
+- Combines API and storage services
+- Manages wallet state
+- Provides simplified interface for screens
+
+### Screen Components
+
+Each screen is a React Native functional component:
+- Uses React hooks (useState, useEffect)
+- Implements SafeAreaView for proper device spacing
+- Uses commonStyles for consistent UI
+- Handles loading states and error messages
+
+## Development Guidelines
+
+### Code Style
+
+- Use functional components with hooks
+- Use async/await for asynchronous operations
+- Handle errors with try/catch blocks
+- Show user-friendly error messages with Alert
+- Use commonStyles for consistent styling
+
+### Adding a New Screen
+
+1. Create file in `src/screens/`
+2. Import required dependencies
+3. Implement screen component
+4. Add to navigation in `App.js`
+5. Test on both iOS and Android
+
+### Adding a New API Method
+
+1. Add method to `nexus-api.js`
+2. Add high-level method to `wallet.js`
+3. Use in screen components
+4. Handle errors appropriately
+
+### Security Best Practices
+
+- Never log sensitive data (PINs, passwords, session tokens)
+- Use SecureStore for all sensitive data
+- Validate all user inputs
+- Require PIN for transactions
+- Clear session on logout
+
+## Testing
+
+### Manual Testing
+
+```bash
+# Run on iOS simulator
+npm run ios
+
+# Run on Android emulator
+npm run android
+
+# Test on physical device with Expo Go
+npm start
+# Then scan QR code
+```
+
+### Testing Checklist
+
+- [ ] Login with valid credentials
+- [ ] Login with invalid credentials (error handling)
+- [ ] View balance and transactions
+- [ ] Send transaction with PIN
+- [ ] Cancel transaction
+- [ ] Receive - display address and QR code
+- [ ] Create new account
+- [ ] Change node settings
+- [ ] Logout
+- [ ] Pull-to-refresh on wallet screen
+
+## Building for Production
+
+### iOS Build
+
+```bash
+# Build for iOS
+expo build:ios
+
+# Or with EAS Build (recommended)
+eas build --platform ios
+```
+
+### Android Build
+
+```bash
+# Build for Android
+expo build:android
+
+# Or with EAS Build (recommended)
+eas build --platform android
+```
+
+## Debugging
+
+### React Native Debugger
+
+1. Open app in Expo Go or simulator
+2. Shake device or press Cmd+D (iOS) / Cmd+M (Android)
+3. Select "Debug Remote JS"
+4. Open Chrome DevTools
+
+### Viewing Logs
+
+```bash
+# View logs from Expo CLI
+# Logs appear automatically in terminal where you ran npm start
+
+# Or use React Native Debugger
+# or Expo DevTools
+```
+
+### Common Issues
+
+**Build fails:**
+- Clear cache: `expo start -c`
+- Delete node_modules: `rm -rf node_modules && npm install`
+
+**App crashes on startup:**
+- Check error logs in terminal
+- Verify all dependencies are installed
+- Check for syntax errors
+
+**API connection fails:**
+- Verify node URL is correct
+- Check network connectivity
+- Ensure node is running and accessible
+
+## Contributing
+
+1. Fork the repository
+2. Create feature branch: `git checkout -b feature-name`
+3. Make changes and test thoroughly
+4. Commit: `git commit -am 'Add feature'`
+5. Push: `git push origin feature-name`
+6. Create Pull Request
+
+### Pull Request Guidelines
+
+- Describe changes clearly
+- Include screenshots for UI changes
+- Test on both iOS and Android
+- Follow existing code style
+- Update documentation if needed
+
+## Resources
+
+- [React Native Documentation](https://reactnative.dev/)
+- [Expo Documentation](https://docs.expo.dev/)
+- [React Navigation](https://reactnavigation.org/)
+- [Nexus API Documentation](Nexus%20api%20docs/API/README.MD)
+
+## Support
+
+For issues or questions:
+- GitHub Issues: https://github.com/AkstonCap/q-wallet/issues
+- Nexus Community: https://nexus.io/community
+
+---
+
+**Note**: This is a mobile application. For browser extension development, see the `browser-extension` branch.
     }
 
     async function sendTransaction() {

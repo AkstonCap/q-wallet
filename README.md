@@ -1,6 +1,6 @@
-# Distordia Q-Wallet
+# Distordia Q-Wallet Mobile
 
-A secure cryptocurrency wallet browser extension for the Nexus blockchain, similar to MetaMask but specifically designed for Nexus.io.
+A secure cryptocurrency mobile wallet for the Nexus blockchain. Built with React Native and Expo for iOS and Android.
 
 ![Nexus Wallet](icons/icon128.png)
 
@@ -10,51 +10,56 @@ A secure cryptocurrency wallet browser extension for the Nexus blockchain, simil
 - 🔐 **Secure Account Management** - Create and manage Nexus accounts with encrypted storage
 - 💰 **Send & Receive NXS** - Easy-to-use interface for sending and receiving NXS tokens
 - 📊 **Transaction History** - View all your past transactions
-- 🔄 **Real-time Balance Updates** - Automatic balance refresh every 5 minutes
+- 🔄 **Pull to Refresh** - Update your balance and transactions with a simple swipe
 - ⚙️ **Configurable Node** - Connect to any Nexus node (local or remote)
 - 🔒 **Session Management** - Secure login/logout with PIN protection
-
-### dApp Integration
-- 🌐 **Web3 Provider** - Inject `window.nexus` object for dApp connectivity
-- 🤝 **dApp Connections** - Connect your wallet to Nexus-based decentralized applications
-- ✍️ **Transaction Signing** - Sign and approve transactions from dApps
-- 📡 **Message Passing** - Secure communication between dApps and wallet
+- 📱 **Native Mobile UI** - Optimized for iOS and Android devices
 
 ### Security Features
 - 🔑 **Password Protected** - Strong password encryption
 - 🔢 **PIN Authentication** - Additional PIN layer for transaction approval
-- 🔐 **Secure Storage** - Chrome's secure storage API for sensitive data
+- 🔐 **Secure Storage** - React Native SecureStore for sensitive data
 - 🚪 **Lock/Unlock** - Lock your wallet when not in use
-- 👁️ **Session Timeout** - Automatic session management
+- 👁️ **Session Management** - Automatic session handling
 
 ## Installation
 
 ### For Users
 
-1. **Download the Extension**
-   - Clone or download this repository
-   - Or download the latest release from the releases page
+#### iOS
+1. Download from the App Store (coming soon)
+2. Or build from source (see Developer section below)
 
-2. **Install in Chrome/Brave/Edge**
-   - Open your browser and navigate to `chrome://extensions/` (or `brave://extensions/`, `edge://extensions/`)
-   - Enable "Developer mode" (toggle in top-right corner)
-   - Click "Load unpacked"
-   - Select the `qwallet` folder
-
-3. **Install in Firefox**
-   - Open Firefox and navigate to `about:debugging#/runtime/this-firefox`
-   - Click "Load Temporary Add-on"
-   - Select the `manifest.json` file from the `qwallet` folder
+#### Android
+1. Download from Google Play (coming soon)
+2. Or build from source (see Developer section below)
 
 ### For Developers
+
+#### Prerequisites
+- Node.js 18+ and npm
+- Expo CLI
+- For iOS: Mac with Xcode
+- For Android: Android Studio
+
+#### Setup
 
 ```bash
 # Clone the repository
 git clone https://github.com/AkstonCap/q-wallet.git
-cd q-wallet
+cd q-mobile
 
-# No build process required - it's vanilla JavaScript!
-# Just load the extension in your browser as described above
+# Install dependencies
+npm install
+
+# Start development server
+npm start
+
+# Run on iOS (requires Mac)
+npm run ios
+
+# Run on Android
+npm run android
 ```
 
 ## Getting Started
@@ -74,30 +79,114 @@ Before using the wallet, you need a Nexus node running. You can:
 
 **Option B: Connect to a Remote Node**
 - Use a public Nexus node or hosted service like api.distordia.com
-- Configure the node URL in wallet settings (api.distordia.com available as default)
+- Configure the node URL in wallet settings (api.distordia.com is the default)
 
-### 2. Create Your Wallet
+### 2. Login to Your Wallet
 
-1. Click the Nexus Wallet extension icon
-2. Click "Create New Wallet"
-3. Enter your details:
-   - **Username**: Your unique identifier
-   - **Password**: Strong password (min 8 characters)
-   - **PIN**: 4-8 digit PIN for transaction approval
-4. Confirm and create
+The mobile app requires an existing Nexus SigChain account. To create one:
 
-**⚠️ Important:** Store your username, password and PIN safely! If you forget them, you can only recover your wallet using your private seed phrase (never share this with anyone).
+1. Download the official Nexus Desktop Wallet from https://nexus.io/wallet
+2. Create a new SigChain account with username, password, and PIN
+3. Open the mobile app and login with your credentials
 
 ### 3. Using the Wallet
 
 #### Receive NXS
-1. Click the "Receive" button
-2. Copy your address or share the QR code
+1. Tap the "Receive" button
+2. Share your address or show the QR code
 3. Give this address to whoever is sending you NXS
 
 #### Send NXS
-1. Click the "Send" button
-#### Send NXS
+1. Tap the "Send" button
+2. Enter recipient address
+3. Enter amount to send
+4. Add optional reference/note
+5. Confirm with your PIN
+6. Transaction sent!
+
+#### View Transactions
+- All transactions are shown on the main wallet screen
+- Pull down to refresh your balance and transactions
+- Tap on any transaction to view details
+
+## Project Structure
+
+```
+q-mobile/
+├── App.js                    # Main app with navigation
+├── package.json              # Dependencies
+├── app.json                  # Expo configuration
+├── src/
+│   ├── screens/             # React Native screens
+│   │   ├── LoginScreen.js
+│   │   ├── WalletScreen.js
+│   │   ├── SendScreen.js
+│   │   ├── ReceiveScreen.js
+│   │   ├── SettingsScreen.js
+│   │   ├── CreateAccountScreen.js
+│   │   └── TransactionApprovalScreen.js
+│   ├── services/            # Business logic
+│   │   ├── nexus-api.js    # Nexus blockchain API
+│   │   ├── storage.js      # Secure storage service
+│   │   └── wallet.js       # Wallet service
+│   └── styles/
+│       └── common.js        # Shared styles
+├── assets/                  # App icons and images
+└── icons/                   # Legacy icons
+
+```
+
+## Technology Stack
+
+- **React Native** - Cross-platform mobile framework
+- **Expo** - Development toolchain and services
+- **React Navigation** - Screen navigation
+- **AsyncStorage** - Persistent data storage
+- **SecureStore** - Encrypted storage for sensitive data
+- **QR Code Generator** - For address sharing
+
+## Security
+
+- **Encrypted Storage**: All sensitive data (session tokens, PINs) are stored using Expo SecureStore
+- **HTTPS Enforcement**: Remote node connections require HTTPS
+- **PIN Protection**: All transactions require PIN confirmation
+- **No Private Keys Stored**: The app uses Nexus's SigChain system - no private keys are stored on device
+- **Session Management**: Automatic session timeout and secure logout
+
+## API Documentation
+
+For detailed information about the Nexus API, see the [Nexus API documentation](Nexus%20api%20docs/API/README.MD).
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+See [LICENSE](LICENSE) file for details.
+
+## Support
+
+For issues, questions, or contributions:
+- GitHub Issues: https://github.com/AkstonCap/q-wallet/issues
+- Nexus Community: https://nexus.io/community
+
+## Roadmap
+
+- [ ] Biometric authentication (Face ID / Touch ID)
+- [ ] Multi-account support with easy switching
+- [ ] Token management and custom tokens
+- [ ] Transaction notifications
+- [ ] Address book for frequent recipients
+- [ ] Fiat currency conversion display
+- [ ] Dark/Light theme toggle
+- [ ] Export transaction history
+- [ ] Multi-language support
+
+---
+
+**Note**: This is a mobile wallet application. For browser extension version, see the `browser-extension` branch.
+
 1. Click the "Send" button
 2. Enter recipient address or username
 3. Enter amount to send

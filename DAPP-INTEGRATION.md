@@ -1,4 +1,31 @@
-# dApp Integration Guide
+# dApp Integration - Not Applicable for Mobile
+
+**Note**: This document was for the browser extension version of Q-Wallet. The mobile application does not support dApp integration through browser injection.
+
+For the browser extension version with dApp integration, please see the `browser-extension` branch.
+
+## Mobile Wallet Focus
+
+The mobile version of Q-Wallet is focused on:
+- Direct wallet management
+- Sending and receiving NXS
+- Transaction history
+- Account management
+- Secure storage
+
+## Future Mobile dApp Support
+
+Future versions may support:
+- WalletConnect protocol for dApp connectivity
+- Deep linking for transaction requests
+- QR code transaction signing
+- Mobile-optimized dApp browser
+
+For updates on mobile dApp integration, follow the project repository.
+
+---
+
+Original dApp integration documentation has been preserved in the browser extension branch.
 
 ## Connecting Your Website to Q-Wallet
 

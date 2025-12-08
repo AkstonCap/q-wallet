@@ -1,53 +1,70 @@
-# Nexus Wallet - Quick Start Guide
+# Nexus Mobile Wallet - Quick Start Guide
 
 ## 🚀 Quick Installation (5 minutes)
 
-### Step 1: Install the Extension
+### Step 1: Install Dependencies
 
-**Chrome/Brave/Edge:**
-1. Open `chrome://extensions/`
-2. Enable "Developer mode" (top-right toggle)
-3. Click "Load unpacked"
-4. Select the `qwallet` folder
-5. Done! You'll see the Nexus icon in your toolbar
+```bash
+# Clone the repository
+git clone https://github.com/AkstonCap/q-wallet.git
+cd q-mobile
 
-**Firefox:**
-1. Open `about:debugging#/runtime/this-firefox`
-2. Click "Load Temporary Add-on"
-3. Select `manifest.json` from the `qwallet` folder
-4. Done!
+# Install dependencies
+npm install
+```
 
 ### Step 2: Set Up Nexus Node
 
-**Option A - Local Node (Recommended for Development):**
+**Option A - Use Remote Node (Recommended for Testing):**
+- The app defaults to `https://api.distordia.com`
+- No local setup needed!
+
+**Option B - Local Node (For Development):**
 ```bash
 # Run Nexus core without authentication (testing only)
 ./nexus -noapiauth
 ```
 
-**Option B - Use Existing Node:**
-- Skip this if you already have a Nexus node running
-- Or use a remote node URL
+### Step 3: Create Your Nexus Account
 
-### Step 3: Create Your Wallet
+Before using the mobile app, you need a Nexus SigChain account:
 
-1. Click the Nexus Wallet extension icon
-2. Click "Create New Wallet"
-3. Fill in:
+1. Download Nexus Desktop Wallet from https://nexus.io/wallet
+2. Create account with:
    - Username: `testuser` (or your choice)
    - Password: `password123` (min 8 chars)
-   - Confirm Password: `password123`
    - PIN: `1234` (4-8 digits)
-   - Confirm PIN: `1234`
-4. Click "Create Wallet"
-5. Wait ~2 seconds for creation
-6. You're in! 🎉
+3. Wait for account creation
 
-### Step 4: Test the Wallet
+### Step 4: Run the Mobile App
+
+```bash
+# Start development server
+npm start
+
+# Then press:
+# - 'i' for iOS simulator (Mac only)
+# - 'a' for Android emulator
+# - Scan QR code with Expo Go app for physical device
+```
+
+### Step 5: Login to Your Wallet
+
+1. Open the app
+2. Select API service (use api.distordia.com)
+3. Enter your credentials:
+   - Username: `testuser`
+   - Password: `password123`
+   - PIN: `1234`
+4. Tap "Unlock Wallet"
+5. You're in! 🎉
+
+### Step 6: Test the Wallet
 
 **Get Your Address:**
-1. Click the address in the header to copy it
-2. You'll see a notification "Address copied!"
+1. Tap the address in the header to copy it
+2. You'll see "Address copied!" notification
+3. Your address is now in clipboard
 
 **Configure Node (if needed):**
 1. Click the ⚙️ settings icon

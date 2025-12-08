@@ -98,11 +98,9 @@ function setupEventListeners() {
 async function loadSavedApiUrl() {
   const savedUrl = await wallet.getNodeUrl();
   const loginSelect = document.getElementById('login-api-service');
-  const createSelect = document.getElementById('create-api-service');
   
   // Check if saved URL matches one of the preset options
   const loginOptions = Array.from(loginSelect.options).map(opt => opt.value);
-  const createOptions = Array.from(createSelect.options).map(opt => opt.value);
   
   if (loginOptions.includes(savedUrl)) {
     loginSelect.value = savedUrl;
@@ -112,33 +110,12 @@ async function loadSavedApiUrl() {
     document.getElementById('login-custom-api-group').classList.remove('hidden');
     document.getElementById('login-custom-api').value = savedUrl;
   }
-  
-  if (createOptions.includes(savedUrl)) {
-    createSelect.value = savedUrl;
-  } else if (savedUrl && savedUrl !== 'http://localhost:8080') {
-    // Custom URL
-    createSelect.value = 'custom';
-    document.getElementById('create-custom-api-group').classList.remove('hidden');
-    document.getElementById('create-custom-api').value = savedUrl;
-  }
 }
 
 // Handle API service selection for login
 function handleLoginApiChange() {
   const select = document.getElementById('login-api-service');
   const customGroup = document.getElementById('login-custom-api-group');
-  
-  if (select.value === 'custom') {
-    customGroup.classList.remove('hidden');
-  } else {
-    customGroup.classList.add('hidden');
-  }
-}
-
-// Handle API service selection for create
-function handleCreateApiChange() {
-  const select = document.getElementById('create-api-service');
-  const customGroup = document.getElementById('create-custom-api-group');
   
   if (select.value === 'custom') {
     customGroup.classList.remove('hidden');
@@ -185,19 +162,6 @@ function getLoginApiUrl() {
   const select = document.getElementById('login-api-service');
   if (select.value === 'custom') {
     const customUrl = document.getElementById('login-custom-api').value.trim();
-    if (!customUrl) {
-      throw new Error('Please enter a custom API URL');
-    }
-    return validateNodeUrl(customUrl);
-  }
-  return select.value;
-}
-
-// Get selected API URL from create form
-function getCreateApiUrl() {
-  const select = document.getElementById('create-api-service');
-  if (select.value === 'custom') {
-    const customUrl = document.getElementById('create-custom-api').value.trim();
     if (!customUrl) {
       throw new Error('Please enter a custom API URL');
     }
@@ -1306,14 +1270,27 @@ function showNotification(text, type = 'info') {
 function formatAmount(amount, minDecimals = 2) {
   const num = parseFloat(amount);
   
-  // For very small amounts (fees), show more decimals
-  if (num < 0.01 && num > 0) {
-    // Show up to 6 decimal places for small amounts, removing trailing zeros
-    return num.toFixed(6).replace(/\.?0+$/, '');
+  if (num === 0) {
+    return '0.00';
   }
   
-  // For normal amounts, use standard 2 decimals
-  return num.toFixed(minDecimals);
+  // For very small amounts (< 1), use 6 decimals
+  if (Math.abs(num) < 1) {
+    const decimals = Math.max(6, minDecimals);
+    return num.toFixed(decimals).replace(/\.?0+$/, '').replace(/(\.\d*[1-9])0+$/, '$1');
+  }
+  
+  // Calculate decimals based on magnitude:
+  // 0-9.999...: 6 decimals
+  // 10-99.999...: 5 decimals
+  // 100-999.999...: 4 decimals
+  // 1000-9999.999...: 3 decimals
+  // 10000+: 2 decimals (minimum)
+  
+  const integerDigits = Math.floor(Math.log10(Math.abs(num))) + 1;
+  const decimals = Math.max(minDecimals, 7 - integerDigits);
+  
+  return num.toFixed(decimals).replace(/\.?0+$/, '').replace(/(\.\d*[1-9])0+$/, '$1');
 }
 
 function truncateAddress(address) {

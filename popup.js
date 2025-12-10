@@ -21,6 +21,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     startAutoRefresh();
   } else {
     showScreen('login');
+    // Show and check node status on login screen initialization
+    const statusContainer = document.getElementById('login-node-status');
+    statusContainer.style.display = 'block';
+    await checkNodeStatus('login');
   }
 
   // Setup event listeners
@@ -31,6 +35,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 function setupEventListeners() {
   // API service selectors
   document.getElementById('login-api-service').addEventListener('change', handleLoginApiChange);
+  
+  // Custom API input - check node status when user changes URL
+  const customApiInput = document.getElementById('login-custom-api');
+  let customApiTimeout;
+  customApiInput.addEventListener('input', () => {
+    clearTimeout(customApiTimeout);
+    customApiTimeout = setTimeout(async () => {
+      const statusContainer = document.getElementById('login-node-status');
+      statusContainer.style.display = 'block';
+      await checkNodeStatus('login');
+    }, 500); // Debounce for 500ms
+  });
   
   // Login form
   document.getElementById('login-btn').addEventListener('click', handleLogin);
@@ -92,6 +108,16 @@ function setupEventListeners() {
   // Lock wallet button is commented out in HTML
   // document.getElementById('lock-wallet-btn').addEventListener('click', handleLockWallet);
   document.getElementById('logout-btn').addEventListener('click', handleLogout);
+  
+  // Node URL input in settings - check status when user changes URL
+  const nodeUrlInput = document.getElementById('node-url');
+  let nodeUrlTimeout;
+  nodeUrlInput.addEventListener('input', () => {
+    clearTimeout(nodeUrlTimeout);
+    nodeUrlTimeout = setTimeout(async () => {
+      await checkNodeStatus('settings');
+    }, 500); // Debounce for 500ms
+  });
 }
 
 // Load saved API URL and set it in the selects
@@ -113,15 +139,20 @@ async function loadSavedApiUrl() {
 }
 
 // Handle API service selection for login
-function handleLoginApiChange() {
+async function handleLoginApiChange() {
   const select = document.getElementById('login-api-service');
   const customGroup = document.getElementById('login-custom-api-group');
+  const statusContainer = document.getElementById('login-node-status');
   
   if (select.value === 'custom') {
     customGroup.classList.remove('hidden');
   } else {
     customGroup.classList.add('hidden');
   }
+  
+  // Show status container and check node status
+  statusContainer.style.display = 'block';
+  await checkNodeStatus('login');
 }
 
 // Validate node URL for security (HTTPS enforcement)
@@ -361,12 +392,135 @@ async function loadTransactions() {
 
     container.innerHTML = '';
     
-    transactions.forEach(tx => {
+    // Only show the last 12 transactions
+    const limitedTransactions = transactions.slice(0, 12);
+    
+    limitedTransactions.forEach(tx => {
       const item = createTransactionItem(tx);
       container.appendChild(item);
     });
+    
+    // Show indicator if there are more transactions
+    if (transactions.length > 12) {
+      const moreIndicator = document.createElement('div');
+      moreIndicator.className = 'more-transactions-indicator';
+      moreIndicator.textContent = `+${transactions.length - 12} more transactions`;
+      container.appendChild(moreIndicator);
+    }
   } catch (error) {
     console.error('Failed to load transactions:', error);
+  }
+}
+
+// Check node status
+async function checkNodeStatus(context = 'login') {
+  // Determine which elements to use based on context
+  const prefix = context === 'settings' ? 'settings-' : 'login-';
+  const indicator = document.getElementById(`${prefix}status-indicator`);
+  const statusText = document.getElementById(`${prefix}status-text`);
+  const statusDetails = document.getElementById(`${prefix}status-details`);
+  
+  if (!indicator || !statusText || !statusDetails) {
+    console.error('Node status elements not found for context:', context);
+    return;
+  }
+
+  try {
+    let nodeUrl = context === 'settings' 
+      ? document.getElementById('node-url').value.trim()
+      : (document.getElementById('login-api-service').value === 'custom' 
+          ? document.getElementById('login-custom-api').value.trim()
+          : document.getElementById('login-api-service').value);
+    
+    if (!nodeUrl) {
+      indicator.textContent = '🔴';
+      indicator.title = 'No node URL specified';
+      statusText.textContent = 'No URL';
+      statusText.style.color = '#f44336';
+      statusDetails.textContent = '';
+      return;
+    }
+
+    // Add protocol if missing (default to http)
+    if (!nodeUrl.startsWith('http://') && !nodeUrl.startsWith('https://')) {
+      nodeUrl = 'http://' + nodeUrl;
+    }
+
+    // Check if this is a blocked HTTP remote connection
+    const urlObj = new URL(nodeUrl);
+    const isRemote = urlObj.hostname !== 'localhost' &&
+                     urlObj.hostname !== '127.0.0.1' &&
+                     !urlObj.hostname.startsWith('192.168.') &&
+                     !urlObj.hostname.startsWith('10.') &&
+                     !urlObj.hostname.startsWith('172.16.');
+    const isHttp = urlObj.protocol === 'http:';
+    
+    // Test node connectivity with direct fetch (bypassing NexusAPI validation)
+    const response = await fetch(`${nodeUrl}/system/get/info`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({})
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const info = await response.json();
+    
+    if (info.error) {
+      throw new Error(info.error.message || 'API Error');
+    }
+
+    // If it's a remote HTTP node, show warning
+    if (isRemote && isHttp) {
+      indicator.textContent = '🔴';
+      indicator.title = 'HTTP connections to remote nodes are blocked for security';
+      statusText.textContent = 'HTTP blocked';
+      statusText.style.color = '#f44336';
+      statusDetails.textContent = 'Not secure';
+      return;
+    }
+    
+    // Get sync status flags
+    const synchronized = info.result?.synchronized || false;
+    const syncing = info.result?.syncing || false;
+    const blocks = info.result?.blocks || 0;
+    
+    // Determine status based on synchronized and syncing flags
+    // Green: synchronized is true
+    // Yellow: synchronized is false and syncing is true
+    // Red: error or neither condition met
+    
+    if (synchronized) {
+      indicator.textContent = '🟢';
+      indicator.title = 'Node is synchronized';
+      statusText.textContent = 'Synced';
+      statusText.style.color = '#4caf50';
+      statusDetails.textContent = `Block ${blocks.toLocaleString()}`;
+    } else if (syncing) {
+      indicator.textContent = '🟡';
+      indicator.title = 'Node is syncing';
+      statusText.textContent = 'Syncing';
+      statusText.style.color = '#ff9800';
+      statusDetails.textContent = `Block ${blocks.toLocaleString()}`;
+    } else {
+      indicator.textContent = '🔴';
+      indicator.title = 'Node is not synchronized';
+      statusText.textContent = 'Out of sync';
+      statusText.style.color = '#f44336';
+      statusDetails.textContent = '';
+    }
+    
+  } catch (error) {
+    console.error('Failed to check node status:', error);
+    indicator.textContent = '🔴';
+    indicator.title = 'Unable to connect to node';
+    statusText.textContent = 'Offline';
+    statusText.style.color = '#f44336';
+    statusDetails.textContent = '';
   }
 }
 
@@ -1044,6 +1198,9 @@ async function loadSettings() {
   document.getElementById('settings-genesis').textContent = walletInfo.genesis || '-';
   document.getElementById('node-url').value = nodeUrl;
   
+  // Check node status
+  await checkNodeStatus('settings');
+  
   // Load connected sites
   await loadConnectedSites();
 }
@@ -1158,6 +1315,9 @@ async function handleSaveNode() {
     
     // Update the input field with validated URL (in case HTTP was converted to HTTPS)
     document.getElementById('node-url').value = validatedUrl;
+    
+    // Check node status with the new URL
+    await checkNodeStatus('settings');
   } catch (error) {
     showNotification('Failed to update node URL: ' + error.message, 'error');
   }

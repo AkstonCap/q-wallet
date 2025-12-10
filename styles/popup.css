@@ -89,6 +89,32 @@ body {
   animation: spin 0.5s linear;
 }
 
+.node-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+
+.status-indicator {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.status-text {
+  font-weight: 600;
+  color: white;
+}
+
+.status-details {
+  color: rgba(255, 255, 255, 0.8);
+  margin-left: auto;
+}
+
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
@@ -260,6 +286,17 @@ body {
   padding: 40px 20px;
   color: var(--text-secondary);
   font-size: 14px;
+}
+
+.more-transactions-indicator {
+  text-align: center;
+  padding: 12px;
+  margin-top: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-style: italic;
+  background: var(--surface);
+  border-radius: 6px;
 }
 
 /* Transaction Item */

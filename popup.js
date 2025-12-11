@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   console.log('Wallet initialized:');
   console.log('  - isLoggedIn:', wallet.isLoggedIn());
   console.log('  - isLocked:', wallet.isLocked);
-  console.log('  - session:', wallet.session);
+  console.log('  - session: [REDACTED]');
   console.log('  - username:', wallet.username);
 
   // Load and set saved API URL
@@ -247,7 +247,7 @@ async function handleLogin() {
     const loginResult = await wallet.login(username, password, pin);
     console.log('Login completed:', loginResult);
     console.log('Wallet state after login:');
-    console.log('  - session:', wallet.session);
+    console.log('  - session: [REDACTED]');
     console.log('  - isLocked:', wallet.isLocked);
     
     // Move to wallet UI and load data
@@ -373,16 +373,13 @@ async function loadWalletData() {
       throw new Error('Invalid accounts response from API');
     }
     
-    // Find the default NXS account for main display
+    // Find the default NXS account for main display (for address)
     const defaultAccount = accounts.find(acc => acc.name === 'default' && (acc.token === '0' || acc.ticker === 'NXS'));
     
     if (defaultAccount) {
       const truncatedAddress = truncateAddress(defaultAccount.address);
       document.getElementById('address-text').textContent = truncatedAddress;
       document.getElementById('address-text').setAttribute('data-full-address', defaultAccount.address);
-      
-      // Display NXS balance
-      document.getElementById('balance-amount').textContent = formatAmount(defaultAccount.balance);
     } else {
       console.warn('No default NXS account found in accounts:', accounts);
       // Show first account if available
@@ -391,7 +388,20 @@ async function loadWalletData() {
         const truncatedAddress = truncateAddress(firstAccount.address);
         document.getElementById('address-text').textContent = truncatedAddress;
         document.getElementById('address-text').setAttribute('data-full-address', firstAccount.address);
-        document.getElementById('balance-amount').textContent = formatAmount(firstAccount.balance || 0);
+      }
+    }
+
+    // Get total NXS balance across all accounts
+    try {
+      const totalBalance = await wallet.getTotalNXSBalance();
+      document.getElementById('balance-amount').textContent = formatAmount(totalBalance);
+    } catch (error) {
+      console.error('Failed to get total NXS balance:', error);
+      // Fallback to default account balance if total query fails
+      if (defaultAccount) {
+        document.getElementById('balance-amount').textContent = formatAmount(defaultAccount.balance);
+      } else {
+        document.getElementById('balance-amount').textContent = formatAmount(0);
       }
     }
 

@@ -120,7 +120,7 @@ class StorageService {
   // Save session data (cleared when browser closes)
   async saveSession(sessionData) {
     console.log('=== StorageService.saveSession ===');
-    console.log('Saving session data:', JSON.stringify(sessionData));
+    console.log('Saving session data: [REDACTED for security]');
     console.log('Using storage:', this.useSessionAPI ? 'chrome.storage.session' : 'chrome.storage.local');
     await this.setSession('session', sessionData);
     console.log('Session data saved successfully');
@@ -131,7 +131,7 @@ class StorageService {
     console.log('=== StorageService.getSession ===');
     console.log('Using storage:', this.useSessionAPI ? 'chrome.storage.session' : 'chrome.storage.local');
     const data = await this.getSessionData('session');
-    console.log('Retrieved session data:', data ? JSON.stringify(data) : 'null');
+    console.log('Retrieved session data:', data ? '[REDACTED for security]' : 'null');
     return data;
   }
 

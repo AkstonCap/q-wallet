@@ -188,6 +188,16 @@ class NexusAPI {
     return this.request('finance/get/balances', { session });
   }
 
+  // Get total NXS balance across all accounts (excluding trust)
+  async getTotalNXSBalance(session) {
+    const response = await this.request('finance/list/account/balance/sum', {
+      session,
+      where: 'results.token=0'
+    });
+    // API returns sum in result.balance
+    return response.result || response;
+  }
+
   // Create a new account
   async createAccount(name, token = 'NXS', session, pin) {
     const params = {

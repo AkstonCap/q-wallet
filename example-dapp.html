@@ -175,6 +175,40 @@
       </div>
     </div>
 
+    <!-- Batch Transaction Section -->
+    <div class="section">
+      <h3>5. Batch Transactions (Multiple Orders)</h3>
+      <p style="color: #666; font-size: 14px;">Execute multiple transactions with a single PIN approval. Perfect for market orders, bulk payments, etc.</p>
+      
+      <div style="margin: 15px 0;">
+        <div class="label">Transaction 1:</div>
+        <input type="text" id="batch-to-1" placeholder="Recipient 1 address">
+        <input type="number" id="batch-amount-1" placeholder="Amount 1" step="0.01" min="0" value="1.5">
+        <input type="text" id="batch-ref-1" placeholder="Reference 1 (optional)" value="Order #1">
+      </div>
+      
+      <div style="margin: 15px 0;">
+        <div class="label">Transaction 2:</div>
+        <input type="text" id="batch-to-2" placeholder="Recipient 2 address">
+        <input type="number" id="batch-amount-2" placeholder="Amount 2" step="0.01" min="0" value="2.5">
+        <input type="text" id="batch-ref-2" placeholder="Reference 2 (optional)" value="Order #2">
+      </div>
+      
+      <div style="margin: 15px 0;">
+        <div class="label">Transaction 3:</div>
+        <input type="text" id="batch-to-3" placeholder="Recipient 3 address">
+        <input type="number" id="batch-amount-3" placeholder="Amount 3" step="0.01" min="0" value="0.75">
+        <input type="text" id="batch-ref-3" placeholder="Reference 3 (optional)" value="Order #3">
+      </div>
+      
+      <button id="batch-send-btn" onclick="sendBatchTransactions()" disabled style="background: #ff6600;">Send Batch (3 Transactions)</button>
+      
+      <div id="batch-result" style="display: none;">
+        <div class="label">Batch Result:</div>
+        <div class="info-item" id="batch-data"></div>
+      </div>
+    </div>
+
     <!-- Code Example -->
     <div class="section">
       <h3>Developer Reference</h3>
@@ -189,13 +223,21 @@ if (typeof window.nexus !== 'undefined') {
   const balance = await window.nexus.getBalance();
   console.log('Balance:', balance);
   
-  // Send transaction
+  // Send single transaction
   const tx = await window.nexus.sendTransaction({
     to: 'recipient-address',
     amount: 10.5,
     reference: 'Payment'
   });
   console.log('Transaction:', tx);
+  
+  // Send batch transactions (NEW!)
+  const batchResult = await window.nexus.sendBatchTransactions([
+    { to: 'address1', amount: 5.0, reference: 'Order #1' },
+    { to: 'address2', amount: 3.5, reference: 'Order #2' },
+    { to: 'address3', amount: 1.5, reference: 'Order #3' }
+  ]);
+  console.log('Batch result:', batchResult);
 }</code></pre>
     </div>
   </div>
@@ -235,6 +277,7 @@ if (typeof window.nexus !== 'undefined') {
           document.getElementById('balance-btn').disabled = false;
           document.getElementById('send-btn').disabled = false;
           document.getElementById('history-btn').disabled = false;
+          document.getElementById('batch-send-btn').disabled = false;
         } else {
           updateStatus('No accounts found. Please log in to your wallet.', 'error');
         }
@@ -288,6 +331,7 @@ if (typeof window.nexus !== 'undefined') {
           document.getElementById('balance-btn').disabled = false;
           document.getElementById('send-btn').disabled = false;
           document.getElementById('history-btn').disabled = false;
+          document.getElementById('batch-send-btn').disabled = false;
         } else {
           updateStatus('Wallet not connected. Click "Connect Wallet" button.', '');
           
@@ -371,6 +415,51 @@ if (typeof window.nexus !== 'undefined') {
       } catch (error) {
         console.error('Get history failed:', error);
         updateStatus('Failed to get history: ' + error.message, 'error');
+      }
+    }
+
+    // Send batch transactions
+    async function sendBatchTransactions() {
+      try {
+        // Collect all transactions
+        const transactions = [];
+        
+        for (let i = 1; i <= 3; i++) {
+          const to = document.getElementById(`batch-to-${i}`).value.trim();
+          const amount = parseFloat(document.getElementById(`batch-amount-${i}`).value);
+          const reference = document.getElementById(`batch-ref-${i}`).value.trim();
+          
+          if (to && amount && amount > 0) {
+            transactions.push({
+              to: to,
+              amount: amount,
+              reference: reference || undefined
+            });
+          }
+        }
+        
+        if (transactions.length === 0) {
+          alert('Please enter at least one transaction with recipient and amount');
+          return;
+        }
+        
+        updateStatus(`Sending batch of ${transactions.length} transactions...`, '');
+        
+        const result = await window.nexus.sendBatchTransactions(transactions);
+        
+        document.getElementById('batch-data').textContent = JSON.stringify(result, null, 2);
+        document.getElementById('batch-result').style.display = 'block';
+        updateStatus(`Batch transaction successful! ${result.successfulTransactions}/${result.totalTransactions} completed.`, 'connected');
+        
+        // Clear form
+        for (let i = 1; i <= 3; i++) {
+          document.getElementById(`batch-to-${i}`).value = '';
+          document.getElementById(`batch-amount-${i}`).value = '';
+          document.getElementById(`batch-ref-${i}`).value = '';
+        }
+      } catch (error) {
+        console.error('Batch transaction failed:', error);
+        updateStatus('Batch transaction failed: ' + error.message, 'error');
       }
     }
 

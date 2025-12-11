@@ -7,19 +7,39 @@ let autoRefreshInterval = null;
 
 // Initialize popup
 document.addEventListener('DOMContentLoaded', async () => {
+  console.log('=== Popup DOMContentLoaded ===');
+  
   // Initialize wallet service
   wallet = new WalletService();
-  await wallet.initialize();
+  const isLoggedIn = await wallet.initialize();
+  
+  console.log('Wallet initialized:');
+  console.log('  - isLoggedIn:', wallet.isLoggedIn());
+  console.log('  - isLocked:', wallet.isLocked);
+  console.log('  - session:', wallet.session);
+  console.log('  - username:', wallet.username);
 
   // Load and set saved API URL
   await loadSavedApiUrl();
 
   // Check if user is logged in
-  if (wallet.isLoggedIn() && !wallet.isLocked) {
+  if (wallet.isLoggedIn()) {
+    console.log('User has active session - showing wallet screen');
+    console.log('  - isLocked:', wallet.isLocked);
     showScreen('wallet');
-    loadWalletData();
-    startAutoRefresh();
+    
+    // Always load wallet data (balance, accounts, etc. are visible even when locked)
+    await loadWalletData();
+    
+    if (wallet.isLocked) {
+      console.log('Session is locked - showing unlock button, disabling transaction actions');
+      showLockedState();
+    } else {
+      console.log('Session is unlocked - enabling all features');
+      startAutoRefresh();
+    }
   } else {
+    console.log('No active session - showing login screen');
     showScreen('login');
     // Show and check node status on login screen initialization
     const statusContainer = document.getElementById('login-node-status');
@@ -52,6 +72,7 @@ function setupEventListeners() {
   document.getElementById('login-btn').addEventListener('click', handleLogin);
 
   // Wallet screen
+  document.getElementById('unlock-wallet-btn').addEventListener('click', showUnlockModal);
   document.getElementById('send-btn').addEventListener('click', async () => {
     showScreen('send');
     await populateSendAccounts();
@@ -212,37 +233,44 @@ async function handleLogin() {
     return;
   }
 
+  console.log('=== handleLogin started ===');
   showLoading('Logging in...');
 
   try {
     // Set the selected API URL before login
     const apiUrl = getLoginApiUrl();
+    console.log('Setting API URL:', apiUrl);
     await wallet.updateNodeUrl(apiUrl);
     
-    // Create and save session (locked)
-    await wallet.login(username, password, pin);
+    // Create session and unlock it (login attempts to unlock automatically)
+    console.log('Calling wallet.login()...');
+    const loginResult = await wallet.login(username, password, pin);
+    console.log('Login completed:', loginResult);
+    console.log('Wallet state after login:');
+    console.log('  - session:', wallet.session);
+    console.log('  - isLocked:', wallet.isLocked);
     
-    // Move to wallet UI immediately
+    // Move to wallet UI and load data
     showScreen('wallet');
     hideLoading();
     showNotification('Login successful!', 'success');
     
-    // Unlock session and load data in background
-    try {
-      await wallet.unlock(pin);
-      await loadWalletData();
+    await loadWalletData();
+    
+    if (wallet.isLocked) {
+      console.log('Session is locked - showing locked state');
+      showLockedState();
+    } else {
+      console.log('Session is unlocked - starting auto-refresh');
       startAutoRefresh();
-    } catch (unlockError) {
-      console.error('Failed to unlock session or load data:', unlockError);
-      console.error('Error details:', unlockError.message);
-      showNotification('Warning: Failed to unlock session - ' + unlockError.message, 'warning');
     }
     
-    // SECURITY: Clear sensitive data after unlock completes
+    // SECURITY: Clear sensitive data
     document.getElementById('login-username').value = '';
     document.getElementById('login-password').value = '';
     document.getElementById('login-pin').value = '';
   } catch (error) {
+    console.error('Login failed:', error);
     showNotification('Login failed: ' + error.message, 'error');
     hideLoading();
     // Clear password and PIN on error too
@@ -1412,6 +1440,121 @@ function showLoading(text = 'Processing...') {
 // Hide loading overlay
 function hideLoading() {
   document.getElementById('loading-overlay').classList.add('hidden');
+}
+
+// Show unlock prompt overlay
+function showUnlockPrompt() {
+  const overlay = document.getElementById('loading-overlay');
+  overlay.classList.remove('hidden');
+  overlay.innerHTML = `
+    <div style="background: white; padding: 30px; border-radius: 12px; max-width: 300px; text-align: center;">
+      <h3 style="margin: 0 0 15px 0; color: #333;">Wallet Locked</h3>
+      <p style="color: #666; margin-bottom: 20px;">Enter your PIN to unlock</p>
+      <input type="password" id="unlock-pin-input" placeholder="Enter PIN" maxlength="8" 
+        style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; margin-bottom: 15px;" 
+        autocomplete="off">
+      <button id="unlock-btn" class="btn btn-primary" style="width: 100%; padding: 12px; background: #ff6600; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600;">
+        Unlock
+      </button>
+    </div>
+  `;
+  
+  // Focus PIN input
+  setTimeout(() => {
+    const pinInput = document.getElementById('unlock-pin-input');
+    if (pinInput) {
+      pinInput.focus();
+      
+      // Handle unlock
+      const unlockBtn = document.getElementById('unlock-btn');
+      const handleUnlock = async () => {
+        const pin = pinInput.value;
+        if (!pin) {
+          alert('Please enter your PIN');
+          return;
+        }
+        
+        try {
+          overlay.innerHTML = '<div class="spinner"></div><div class="loading-text">Unlocking...</div>';
+          await wallet.unlock(pin);
+          hideLoading();
+          hideLockedState();
+          startAutoRefresh();
+          showNotification('Wallet unlocked!', 'success');
+        } catch (error) {
+          hideLoading();
+          showNotification('Failed to unlock: ' + error.message, 'error');
+          showUnlockPrompt(); // Show prompt again
+        }
+      };
+      
+      unlockBtn.addEventListener('click', handleUnlock);
+      pinInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleUnlock();
+      });
+    }
+  }, 100);
+}
+
+// Show unlock modal (called by unlock button)
+function showUnlockModal() {
+  showUnlockPrompt();
+}
+
+// Show locked state UI
+function showLockedState() {
+  console.log('Showing locked state UI');
+  
+  // Show unlock button
+  const unlockBtn = document.getElementById('unlock-wallet-btn');
+  if (unlockBtn) {
+    unlockBtn.style.display = 'block';
+  }
+  
+  // Disable transaction buttons
+  const sendBtn = document.getElementById('send-btn');
+  const confirmSendBtn = document.getElementById('confirm-send-btn');
+  const createAccountBtn = document.getElementById('create-account-btn');
+  
+  if (sendBtn) {
+    sendBtn.disabled = true;
+    sendBtn.style.opacity = '0.5';
+    sendBtn.title = 'Unlock wallet to send transactions';
+  }
+  if (confirmSendBtn) {
+    confirmSendBtn.disabled = true;
+  }
+  if (createAccountBtn) {
+    createAccountBtn.disabled = true;
+  }
+}
+
+// Hide locked state UI
+function hideLockedState() {
+  console.log('Hiding locked state UI - wallet is unlocked');
+  
+  // Hide unlock button
+  const unlockBtn = document.getElementById('unlock-wallet-btn');
+  if (unlockBtn) {
+    unlockBtn.style.display = 'none';
+  }
+  
+  // Enable transaction buttons
+  const sendBtn = document.getElementById('send-btn');
+  const confirmSendBtn = document.getElementById('confirm-send-btn');
+  const createAccountBtn = document.getElementById('create-account-btn');
+  
+  if (sendBtn) {
+    sendBtn.disabled = false;
+    sendBtn.style.opacity = '1';
+    sendBtn.title = '';
+  }
+  if (confirmSendBtn) {
+    confirmSendBtn.disabled = false;
+  }
+  if (createAccountBtn) {
+    createAccountBtn.disabled = false;
+  }
 }
 
 // Show notification

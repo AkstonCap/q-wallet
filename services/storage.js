@@ -4,16 +4,12 @@
 class StorageService {
   constructor() {
     this.storage = chrome.storage.local; // For persistent data
-    // Use chrome.storage.session for session tokens (auto-cleared on browser close)
-    // Falls back to chrome.storage.local with manual cleanup if session storage unavailable
-    this.sessionStorage = chrome.storage.session || chrome.storage.local;
-    this.useSessionAPI = !!chrome.storage.session;
+    // IMPORTANT: chrome.storage.session has issues with service worker lifecycle in MV3
+    // Using chrome.storage.local for session data with manual cleanup on browser close
+    this.sessionStorage = chrome.storage.local;
+    this.useSessionAPI = false; // Always use local storage for reliability
     
-    if (this.useSessionAPI) {
-      console.log('Using chrome.storage.session for secure session storage');
-    } else {
-      console.warn('chrome.storage.session unavailable, using chrome.storage.local with manual cleanup');
-    }
+    console.log('Using chrome.storage.local for session storage (more reliable in MV3)');
   }
 
   // Save data to storage
@@ -123,12 +119,20 @@ class StorageService {
 
   // Save session data (cleared when browser closes)
   async saveSession(sessionData) {
+    console.log('=== StorageService.saveSession ===');
+    console.log('Saving session data:', JSON.stringify(sessionData));
+    console.log('Using storage:', this.useSessionAPI ? 'chrome.storage.session' : 'chrome.storage.local');
     await this.setSession('session', sessionData);
+    console.log('Session data saved successfully');
   }
 
   // Get session data
   async getSession() {
-    return await this.getSessionData('session');
+    console.log('=== StorageService.getSession ===');
+    console.log('Using storage:', this.useSessionAPI ? 'chrome.storage.session' : 'chrome.storage.local');
+    const data = await this.getSessionData('session');
+    console.log('Retrieved session data:', data ? JSON.stringify(data) : 'null');
+    return data;
   }
 
   // Clear session data (secure deletion - overwrite then remove)

@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Batch Transaction Request</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .header {
+      background: linear-gradient(135deg, #ff6600, #cc5200);
+      color: white;
+      padding: 16px;
+      text-align: center;
+    }
+    
+    .header h1 {
+      font-size: 18px;
+      margin-bottom: 5px;
+    }
+    
+    .header .subtitle {
+      font-size: 12px;
+      opacity: 0.9;
+    }
+    
+    .content {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    
+    .icon {
+      width: 60px;
+      height: 60px;
+      background: #fff3e0;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 32px;
+    }
+    
+    .origin {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    
+    .origin-label {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 5px;
+    }
+    
+    .origin-value {
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+      word-break: break-all;
+    }
+    
+    .batch-summary {
+      background: #f5f5f5;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+    
+    .batch-summary h3 {
+      font-size: 14px;
+      color: #333;
+      margin-bottom: 10px;
+    }
+    
+    .summary-stat {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    
+    .summary-stat:last-child {
+      border-bottom: none;
+    }
+    
+    .summary-stat-label {
+      font-size: 13px;
+      color: #666;
+    }
+    
+    .summary-stat-value {
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+    }
+    
+    .transactions-list {
+      margin-bottom: 20px;
+    }
+    
+    .transactions-header {
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 10px;
+    }
+    
+    .transaction-item {
+      background: #f9f9f9;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    
+    .transaction-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    
+    .transaction-number {
+      font-size: 12px;
+      font-weight: 600;
+      color: #ff6600;
+    }
+    
+    .transaction-amount {
+      font-size: 16px;
+      font-weight: 700;
+      color: #333;
+    }
+    
+    .transaction-detail {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 0;
+      font-size: 12px;
+    }
+    
+    .transaction-detail-label {
+      color: #666;
+    }
+    
+    .transaction-detail-value {
+      color: #333;
+      font-weight: 500;
+      word-break: break-all;
+      text-align: right;
+      max-width: 60%;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 8px;
+    }
+    
+    .form-group input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    
+    .form-group input:focus {
+      outline: none;
+      border-color: #ff6600;
+    }
+    
+    .warning {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 20px;
+      font-size: 12px;
+      color: #856404;
+    }
+    
+    .warning strong {
+      display: block;
+      margin-bottom: 5px;
+    }
+    
+    .actions {
+      position: sticky;
+      bottom: 0;
+      background: white;
+      padding: 15px 20px;
+      border-top: 1px solid #e0e0e0;
+      display: flex;
+      gap: 10px;
+    }
+    
+    .btn {
+      flex: 1;
+      padding: 14px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .btn:active {
+      transform: scale(0.98);
+    }
+    
+    .btn-reject {
+      background: #f5f5f5;
+      color: #333;
+    }
+    
+    .btn-reject:hover {
+      background: #e0e0e0;
+    }
+    
+    .btn-approve {
+      background: #ff6600;
+      color: white;
+    }
+    
+    .btn-approve:hover {
+      background: #e55a00;
+    }
+    
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .status-message {
+      text-align: center;
+      padding: 20px;
+      font-size: 14px;
+    }
+    
+    .status-message.processing {
+      color: #ff6600;
+    }
+    
+    .status-message.success {
+      color: #28a745;
+    }
+    
+    .status-message.error {
+      color: #dc3545;
+    }
+    
+    .status-icon {
+      font-size: 48px;
+      margin-bottom: 10px;
+    }
+    
+    .result-details {
+      margin-top: 15px;
+      font-size: 12px;
+      color: #666;
+    }
+    
+    .truncate {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Batch Transaction Request</h1>
+    <div class="subtitle">Distordia Q-wallet</div>
+  </div>
+
+  <div class="content" id="approval-content">
+    <div class="icon">📦</div>
+    
+    <div class="origin">
+      <div class="origin-label">dApp requesting batch transaction</div>
+      <div class="origin-value" id="origin">Loading...</div>
+    </div>
+
+    <div class="batch-summary">
+      <h3>Batch Summary</h3>
+      <div class="summary-stat">
+        <span class="summary-stat-label">Total Transactions:</span>
+        <span class="summary-stat-value" id="total-transactions">0</span>
+      </div>
+      <div class="summary-stat">
+        <span class="summary-stat-label">Total Amount:</span>
+        <span class="summary-stat-value" id="total-amount">0.00 NXS</span>
+      </div>
+    </div>
+
+    <div class="warning">
+      <strong>⚠️ Warning</strong>
+      You are about to execute multiple transactions with a single approval. 
+      Review each transaction carefully before proceeding.
+    </div>
+
+    <div class="transactions-list">
+      <div class="transactions-header">Transactions to Execute:</div>
+      <div id="transactions-container">
+        <!-- Transactions will be dynamically inserted here -->
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="pin">Enter PIN to Approve All Transactions</label>
+      <input 
+        type="password" 
+        id="pin" 
+        placeholder="Enter your PIN" 
+        maxlength="8"
+        autocomplete="off"
+      >
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-reject" id="reject-btn">Reject</button>
+    <button class="btn btn-approve" id="approve-btn">Approve All</button>
+  </div>
+
+  <script>
+    // Get parameters from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const requestId = urlParams.get('requestId');
+    const origin = urlParams.get('origin');
+    const batchJson = urlParams.get('batch');
+    
+    let transactions = [];
+    
+    try {
+      transactions = JSON.parse(decodeURIComponent(batchJson));
+    } catch (error) {
+      console.error('Failed to parse batch transactions:', error);
+      document.getElementById('approval-content').innerHTML = `
+        <div class="status-message error">
+          <div class="status-icon">❌</div>
+          <div>Invalid batch transaction data</div>
+        </div>
+      `;
+    }
+    
+    // Display origin
+    document.getElementById('origin').textContent = origin || 'Unknown dApp';
+    
+    // Calculate total amount
+    let totalAmount = 0;
+    transactions.forEach(tx => {
+      totalAmount += parseFloat(tx.amount) || 0;
+    });
+    
+    // Display batch summary
+    document.getElementById('total-transactions').textContent = transactions.length;
+    document.getElementById('total-amount').textContent = formatAmount(totalAmount) + ' NXS';
+    
+    // Display individual transactions
+    const container = document.getElementById('transactions-container');
+    transactions.forEach((tx, index) => {
+      const txElement = document.createElement('div');
+      txElement.className = 'transaction-item';
+      txElement.innerHTML = `
+        <div class="transaction-item-header">
+          <span class="transaction-number">Transaction #${index + 1}</span>
+          <span class="transaction-amount">${formatAmount(tx.amount)} NXS</span>
+        </div>
+        <div class="transaction-detail">
+          <span class="transaction-detail-label">From:</span>
+          <span class="transaction-detail-value">${tx.from || 'default'}</span>
+        </div>
+        <div class="transaction-detail">
+          <span class="transaction-detail-label">To:</span>
+          <span class="transaction-detail-value truncate" title="${tx.to}">${tx.to}</span>
+        </div>
+        ${tx.reference ? `
+        <div class="transaction-detail">
+          <span class="transaction-detail-label">Reference:</span>
+          <span class="transaction-detail-value">${tx.reference}</span>
+        </div>
+        ` : ''}
+      `;
+      container.appendChild(txElement);
+    });
+    
+    // Helper function to format amounts
+    function formatAmount(amount) {
+      const num = parseFloat(amount);
+      if (isNaN(num)) return '0.00';
+      
+      const integerDigits = Math.floor(Math.abs(num)).toString().length;
+      const minDecimals = 2;
+      const decimals = Math.max(minDecimals, 7 - integerDigits);
+      
+      return num.toFixed(decimals);
+    }
+    
+    // Handle approve
+    document.getElementById('approve-btn').addEventListener('click', async () => {
+      const pin = document.getElementById('pin').value;
+      
+      if (!pin) {
+        alert('Please enter your PIN');
+        return;
+      }
+      
+      // Disable buttons
+      document.getElementById('approve-btn').disabled = true;
+      document.getElementById('reject-btn').disabled = true;
+      document.getElementById('pin').disabled = true;
+      
+      // Show processing status
+      document.getElementById('approval-content').innerHTML = `
+        <div class="status-message processing">
+          <div class="status-icon">⏳</div>
+          <div>Processing ${transactions.length} transaction${transactions.length > 1 ? 's' : ''}...</div>
+          <div class="result-details">This may take a moment. Please wait.</div>
+        </div>
+      `;
+      
+      // Send approval response to background script
+      chrome.runtime.sendMessage({
+        type: 'TRANSACTION_APPROVAL_RESPONSE',
+        requestId: requestId,
+        approved: true,
+        pin: pin,
+        transactionData: { origin, transactions }
+      });
+      
+      // Listen for transaction result
+      const resultListener = (message) => {
+        if (message.type === 'BATCH_TRANSACTION_RESULT' && message.requestId === requestId) {
+          chrome.runtime.onMessage.removeListener(resultListener);
+          
+          if (message.success) {
+            document.getElementById('approval-content').innerHTML = `
+              <div class="status-message success">
+                <div class="status-icon">✅</div>
+                <div>Batch Transaction Successful!</div>
+                <div class="result-details">
+                  ${message.successfulTransactions} of ${message.totalTransactions} transactions completed successfully.
+                </div>
+              </div>
+            `;
+            
+            // Close window after 2 seconds
+            setTimeout(() => {
+              window.close();
+            }, 2000);
+          } else {
+            document.getElementById('approval-content').innerHTML = `
+              <div class="status-message error">
+                <div class="status-icon">❌</div>
+                <div>Batch Transaction Failed</div>
+                <div class="result-details">
+                  ${message.successfulTransactions || 0} of ${message.totalTransactions} transactions completed before error.
+                </div>
+              </div>
+            `;
+            
+            // Close window after 3 seconds
+            setTimeout(() => {
+              window.close();
+            }, 3000);
+          }
+        }
+      };
+      
+      chrome.runtime.onMessage.addListener(resultListener);
+      
+      // Fallback timeout
+      setTimeout(() => {
+        chrome.runtime.onMessage.removeListener(resultListener);
+        document.getElementById('approval-content').innerHTML = `
+          <div class="status-message error">
+            <div class="status-icon">⏱️</div>
+            <div>Request Timeout</div>
+            <div class="result-details">The transaction took too long to process.</div>
+          </div>
+        `;
+        setTimeout(() => window.close(), 2000);
+      }, 60000); // 60 second timeout
+    });
+    
+    // Handle reject
+    document.getElementById('reject-btn').addEventListener('click', () => {
+      chrome.runtime.sendMessage({
+        type: 'TRANSACTION_APPROVAL_RESPONSE',
+        requestId: requestId,
+        approved: false,
+        transactionData: { origin, transactions }
+      });
+      
+      window.close();
+    });
+    
+    // Allow Enter key to submit
+    document.getElementById('pin').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        document.getElementById('approve-btn').click();
+      }
+    });
+    
+    // Auto-focus PIN input
+    document.getElementById('pin').focus();
+  </script>
+</body>
+</html>

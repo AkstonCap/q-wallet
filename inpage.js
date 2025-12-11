@@ -111,6 +111,19 @@
       }
     }
 
+    // Send multiple transactions with single approval
+    async sendBatchTransactions(transactions) {
+      try {
+        return await this.request({
+          method: 'dapp.sendBatchTransactions',
+          params: { transactions }
+        });
+      } catch (error) {
+        console.error('Failed to send batch transactions:', error);
+        throw error;
+      }
+    }
+
     // Sign transaction
     async signTransaction(transaction) {
       try {

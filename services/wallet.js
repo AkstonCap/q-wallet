@@ -19,15 +19,22 @@ class WalletService {
 
     // Check for existing session
     const savedSession = await this.storage.getSession();
-    console.log('Initialize: Retrieved saved session:', savedSession);
+    console.log('=== WalletService Initialize ===');
+    console.log('Retrieved saved session:', savedSession);
+    console.log('Session data:', savedSession ? JSON.stringify(savedSession) : 'null');
+    
     if (savedSession) {
       this.session = savedSession.session;
       this.genesis = savedSession.genesis;
       this.username = savedSession.username;
-      this.isLocked = savedSession.isLocked || false;
-      console.log('Initialize: Session loaded - session:', this.session, 'genesis:', this.genesis);
+      this.isLocked = savedSession.isLocked !== undefined ? savedSession.isLocked : false;
+      console.log('Session loaded:');
+      console.log('  - session:', this.session);
+      console.log('  - genesis:', this.genesis);
+      console.log('  - username:', this.username);
+      console.log('  - isLocked:', this.isLocked);
     } else {
-      console.log('Initialize: No saved session found');
+      console.log('No saved session found');
     }
 
     return this.isLoggedIn();
@@ -99,23 +106,40 @@ class WalletService {
       this.session = sessionData.session;
       this.genesis = sessionData.genesis;
       this.username = username;
-      this.isLocked = true; // Session starts locked
       
+      console.log('=== Login successful ===');
       console.log('Session set:', this.session);
       console.log('Genesis set:', this.genesis);
+      console.log('Username set:', this.username);
+      
+      // Nexus sessions are created in locked state by default
+      // We need to unlock them with the PIN to enable transactions
+      console.log('=== Unlocking session after login ===');
+      try {
+        await this.api.unlockSession(pin, this.session);
+        this.isLocked = false;
+        console.log('Session unlocked successfully');
+      } catch (unlockError) {
+        console.warn('Could not unlock session immediately:', unlockError.message);
+        this.isLocked = true;
+      }
 
-      // Save session to sessionStorage (cleared when browser closes)
-      await this.storage.saveSession({
+      // Save session state
+      const sessionToSave = {
         session: this.session,
         genesis: this.genesis,
         username: this.username,
-        isLocked: true
-      });
+        isLocked: this.isLocked
+      };
+      console.log('Saving session to storage:', JSON.stringify(sessionToSave));
+      await this.storage.saveSession(sessionToSave);
+      console.log('Session saved successfully');
 
       return {
         success: true,
         genesis: this.genesis,
-        username: this.username
+        username: this.username,
+        isLocked: this.isLocked
       };
     } catch (error) {
       console.error('Failed to login:', error);
@@ -138,16 +162,23 @@ class WalletService {
         throw new Error('PIN is required to unlock session');
       }
       
+      console.log('=== Calling unlockSession API ===');
       await this.api.unlockSession(pin, this.session);
+      console.log('API unlockSession successful');
+      
       this.isLocked = false;
+      console.log('isLocked set to: false');
 
       // Update session in sessionStorage
-      await this.storage.saveSession({
+      const sessionToSave = {
         session: this.session,
         genesis: this.genesis,
         username: this.username,
         isLocked: false
-      });
+      };
+      console.log('Updating session in storage:', JSON.stringify(sessionToSave));
+      await this.storage.saveSession(sessionToSave);
+      console.log('Session updated successfully - wallet is now unlocked');
 
       return { success: true };
     } catch (error) {

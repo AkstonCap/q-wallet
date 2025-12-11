@@ -202,6 +202,17 @@ async function handleMessage(request, sender) {
       }
       // Request transaction approval from user with PIN
       return await handleDAppTransaction(params);
+    
+    case 'dapp.sendBatchTransactions':
+      console.log('=== dapp.sendBatchTransactions case triggered ===');
+      console.log('Sender:', sender);
+      console.log('Params:', params);
+      await checkDAppPermission(params.origin);
+      if (!wallet.isLoggedIn()) {
+        throw new Error('Wallet not connected');
+      }
+      // Request batch transaction approval from user with single PIN
+      return await handleDAppBatchTransaction(params);
 
     default:
       throw new Error(`Unknown method: ${method}`);
@@ -447,6 +458,188 @@ async function handleDAppTransaction(params) {
   }
   
   return { result };
+}
+
+// Handle dApp batch transaction request with user approval
+async function handleDAppBatchTransaction(params) {
+  const { origin, transactions } = params;
+  
+  console.log('=== handleDAppBatchTransaction called ===');
+  console.log('Origin:', origin);
+  console.log('Number of transactions:', transactions?.length);
+  console.log('Transactions:', transactions);
+  
+  // Validate input
+  if (!Array.isArray(transactions) || transactions.length === 0) {
+    throw new Error('Invalid batch: transactions must be a non-empty array');
+  }
+  
+  if (transactions.length > 10) {
+    throw new Error('Batch too large: maximum 10 transactions allowed');
+  }
+  
+  // Validate each transaction
+  for (let i = 0; i < transactions.length; i++) {
+    const tx = transactions[i];
+    if (!tx.to || !tx.amount) {
+      throw new Error(`Invalid transaction at index ${i}: 'to' and 'amount' are required`);
+    }
+    // Add default 'from' if not specified
+    if (!tx.from) {
+      transactions[i].from = 'default';
+    }
+  }
+  
+  // Request user approval via popup
+  console.log('Requesting batch transaction approval...');
+  const approval = await requestBatchTransactionApproval({
+    origin,
+    transactions
+  });
+  
+  console.log('=== Batch approval received ===');
+  console.log('Approval:', approval);
+  
+  if (!approval.approved) {
+    console.log('Batch transaction was rejected by user');
+    throw new Error('Batch transaction rejected by user');
+  }
+  
+  if (!approval.pin) {
+    console.log('ERROR: No PIN in approval');
+    throw new Error('PIN is required for transactions');
+  }
+  
+  // Verify wallet state
+  if (!wallet.session) {
+    throw new Error('Wallet session not available. Please log in again.');
+  }
+  
+  // Execute all transactions
+  console.log('=== Executing batch transactions ===');
+  const results = [];
+  const errors = [];
+  
+  for (let i = 0; i < transactions.length; i++) {
+    const tx = transactions[i];
+    console.log(`Executing transaction ${i + 1}/${transactions.length}:`, tx);
+    
+    try {
+      const result = await wallet.send(
+        tx.from,
+        tx.amount,
+        tx.to,
+        approval.pin,
+        tx.reference || undefined
+      );
+      console.log(`Transaction ${i + 1} successful:`, result);
+      results.push({ success: true, result, index: i });
+    } catch (err) {
+      console.error(`Transaction ${i + 1} failed:`, err.message);
+      errors.push({ success: false, error: err.message, index: i });
+      
+      // Optionally stop on first error
+      // You can change this behavior if you want to continue with remaining transactions
+      results.push({ success: false, error: err.message, index: i });
+      break; // Stop on first error
+    }
+  }
+  
+  // Send result back to popup window
+  if (approval.requestId) {
+    console.log('Broadcasting batch transaction results:', { 
+      requestId: approval.requestId, 
+      totalSuccessful: results.filter(r => r.success).length,
+      totalFailed: errors.length
+    });
+    chrome.runtime.sendMessage({
+      type: 'BATCH_TRANSACTION_RESULT',
+      requestId: approval.requestId,
+      success: errors.length === 0,
+      results: results,
+      totalTransactions: transactions.length,
+      successfulTransactions: results.filter(r => r.success).length
+    }).catch((err) => {
+      console.log('Could not broadcast batch results:', err.message);
+    });
+    
+    // Give popup time to receive and display the result
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  
+  if (errors.length > 0) {
+    throw new Error(`Batch transaction failed: ${errors.length} of ${transactions.length} transactions failed`);
+  }
+  
+  return { 
+    result: {
+      totalTransactions: transactions.length,
+      successfulTransactions: results.filter(r => r.success).length,
+      results: results
+    }
+  };
+}
+
+// Request user approval for dApp batch transaction
+async function requestBatchTransactionApproval(batchData) {
+  return new Promise((resolve, reject) => {
+    const requestId = Date.now().toString();
+    console.log('Requesting batch transaction approval:', batchData, 'requestId:', requestId);
+    
+    // Store the pending request
+    pendingTransactionApprovals.set(requestId, { 
+      batchData, 
+      resolve, 
+      reject,
+      requestId
+    });
+    
+    // Create popup window for batch approval
+    const width = 500;
+    const height = 650;
+    
+    // Build URL with batch parameters (encode as JSON)
+    const params = new URLSearchParams({
+      requestId,
+      origin: batchData.origin,
+      batch: JSON.stringify(batchData.transactions)
+    });
+    
+    chrome.windows.create({
+      url: `approve-batch-transaction.html?${params.toString()}`,
+      type: 'popup',
+      width: width,
+      height: height,
+      focused: true
+    }, (window) => {
+      if (chrome.runtime.lastError) {
+        console.error('Failed to create batch approval window:', chrome.runtime.lastError);
+        pendingTransactionApprovals.delete(requestId);
+        reject(new Error('Unable to show batch approval dialog'));
+        return;
+      }
+      
+      console.log('Batch transaction approval window created:', window.id);
+      
+      // Store window ID with the request
+      const pending = pendingTransactionApprovals.get(requestId);
+      if (pending) {
+        pending.windowId = window.id;
+      }
+      
+      // Add timeout - auto-deny after 3 minutes
+      setTimeout(() => {
+        if (pendingTransactionApprovals.has(requestId)) {
+          console.warn('Batch transaction approval timed out');
+          pendingTransactionApprovals.delete(requestId);
+          reject(new Error('Batch approval request timed out'));
+          
+          // Close the window if still open
+          chrome.windows.remove(window.id).catch(() => {});
+        }
+      }, 180000);
+    });
+  });
 }
 
 // Request user approval for dApp transaction

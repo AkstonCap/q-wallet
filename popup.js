@@ -405,8 +405,8 @@ async function loadWalletData() {
       }
     }
 
-    // Load tokens list with all accounts
-    loadTokensList(accounts);
+    // Load tokens list using balances API
+    await loadTokensList();
 
     // Load transactions
     await loadTransactions();
@@ -420,7 +420,8 @@ async function loadWalletData() {
 // Load transactions
 async function loadTransactions() {
   try {
-    const transactions = await wallet.getTransactions('default', 50);
+    // Fetch transactions from all accounts (pass null to get all)
+    const transactions = await wallet.getTransactions(null, 50);
     const container = document.getElementById('transactions-list');
 
     if (!transactions || transactions.length === 0) {
@@ -601,48 +602,74 @@ function stopAutoRefresh() {
 }
 
 // Load tokens list with balances
-function loadTokensList(accounts) {
+async function loadTokensList() {
   const container = document.getElementById('tokens-list');
   
-  if (!accounts || accounts.length === 0) {
-    container.innerHTML = '<div class="empty-state">No accounts found</div>';
-    return;
-  }
-
-  container.innerHTML = '';
-  
-  // Display each account (each account is for a specific token)
-  accounts.forEach(account => {
-    const item = document.createElement('div');
-    item.className = 'token-item';
+  try {
+    // Get balances using finance/get/balances
+    const balances = await wallet.getAllBalances();
+    console.log('Tokens list - balances response:', balances);
     
-    const tokenInfo = document.createElement('div');
-    tokenInfo.className = 'token-info';
+    const balanceArray = balances.result || balances;
+    console.log('Tokens list - balance array:', balanceArray);
     
-    const tokenName = document.createElement('div');
-    tokenName.className = 'token-name';
-    tokenName.textContent = account.ticker || 'Unknown';
-    
-    const tokenDesc = document.createElement('div');
-    tokenDesc.className = 'token-desc';
-    if (account.ticker === 'NXS') {
-      tokenDesc.textContent = account.name || 'default';
-    } else {
-      // Show account name for non-NXS tokens
-      tokenDesc.textContent = account.name || truncateAddress(account.address);
+    if (!balanceArray || (Array.isArray(balanceArray) && balanceArray.length === 0)) {
+      container.innerHTML = '<div class="empty-state">No tokens found</div>';
+      return;
     }
     
-    tokenInfo.appendChild(tokenName);
-    tokenInfo.appendChild(tokenDesc);
+    // Filter out NXS (ticker === 'NXS')
+    const tokens = Array.isArray(balanceArray) 
+      ? balanceArray.filter(b => b.ticker !== 'NXS')
+      : (balanceArray.ticker !== 'NXS' ? [balanceArray] : []);
     
-    const tokenBalance = document.createElement('div');
-    tokenBalance.className = 'token-balance';
-    tokenBalance.textContent = formatAmount(account.balance || 0);
+    console.log('Tokens list - filtered tokens:', tokens);
     
-    item.appendChild(tokenInfo);
-    item.appendChild(tokenBalance);
-    container.appendChild(item);
-  });
+    if (tokens.length === 0) {
+      container.innerHTML = '<div class="empty-state">No tokens found</div>';
+      return;
+    }
+
+    container.innerHTML = '';
+    
+    // Display each token with total balance
+    tokens.forEach(token => {
+      const item = document.createElement('div');
+      item.className = 'token-item';
+      
+      const tokenInfo = document.createElement('div');
+      tokenInfo.className = 'token-info';
+      
+      const tokenName = document.createElement('div');
+      tokenName.className = 'token-name';
+      tokenName.textContent = token.ticker || 'Unknown';
+      
+      const tokenDesc = document.createElement('div');
+      tokenDesc.className = 'token-desc';
+      tokenDesc.textContent = token.token ? truncateAddress(token.token) : 'Token';
+      
+      tokenInfo.appendChild(tokenName);
+      tokenInfo.appendChild(tokenDesc);
+      
+      // Calculate total balance: confirmed + unconfirmed + unclaimed + stake
+      const confirmed = token.confirmed || 0;
+      const unconfirmed = token.unconfirmed || 0;
+      const unclaimed = token.unclaimed || 0;
+      const stake = token.stake || 0;
+      const totalBalance = confirmed + unconfirmed + unclaimed + stake;
+      
+      const tokenBalance = document.createElement('div');
+      tokenBalance.className = 'token-balance';
+      tokenBalance.textContent = formatAmount(totalBalance);
+      
+      item.appendChild(tokenInfo);
+      item.appendChild(tokenBalance);
+      container.appendChild(item);
+    });
+  } catch (error) {
+    console.error('Failed to load tokens list:', error);
+    container.innerHTML = '<div class="empty-state">Failed to load tokens</div>';
+  }
 }
 
 // Create transaction item element
@@ -1200,6 +1227,11 @@ async function handleCreateAccount() {
   } else {
     token = tokenSelect.value;
   }
+
+  console.log('Creating account with:');
+  console.log('  - accountName:', accountName || 'undefined');
+  console.log('  - token:', token);
+  console.log('  - tokenSelect.value:', tokenSelect.value);
 
   showLoading('Creating account...');
 

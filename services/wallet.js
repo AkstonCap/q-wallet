@@ -345,16 +345,18 @@ class WalletService {
         return 0;
       }
       
-      // Sum confirmed + unconfirmed + unclaimed
+      // Sum confirmed + unconfirmed + unclaimed + stake
       const confirmed = nxsBalance.confirmed || 0;
       const unconfirmed = nxsBalance.unconfirmed || 0;
       const unclaimed = nxsBalance.unclaimed || 0;
-      const total = confirmed + unconfirmed + unclaimed;
+      const stake = nxsBalance.stake || 0;
+      const total = confirmed + unconfirmed + unclaimed + stake;
       
       console.log('NXS balance components:');
       console.log('  - confirmed:', confirmed);
       console.log('  - unconfirmed:', unconfirmed);
       console.log('  - unclaimed:', unclaimed);
+      console.log('  - stake:', stake);
       console.log('  - total:', total);
       
       return total;
@@ -519,15 +521,47 @@ class WalletService {
     }
   }
 
-  // Get transaction history
-  async getTransactions(accountName = 'default', limit = 100) {
+  // Get transaction history from all accounts
+  async getTransactions(accountName = null, limit = 100) {
     try {
-      const transactions = await this.api.getTransactions(accountName, this.session, limit);
+      let allTransactions = [];
+      
+      // If specific account requested, fetch only for that account
+      if (accountName) {
+        const transactions = await this.api.getTransactions(accountName, this.session, limit);
+        allTransactions = transactions;
+      } else {
+        // Fetch transactions from all accounts
+        console.log('Fetching transactions from all accounts...');
+        const accounts = await this.listAccounts();
+        console.log('Found accounts:', accounts.length);
+        
+        // Fetch transactions for each account in parallel
+        const transactionPromises = accounts.map(account => 
+          this.api.getTransactions(account.name || account.address, this.session, limit)
+            .catch(error => {
+              console.warn(`Failed to fetch transactions for account ${account.name || account.address}:`, error.message);
+              return []; // Return empty array if account has no transactions or error
+            })
+        );
+        
+        const transactionArrays = await Promise.all(transactionPromises);
+        
+        // Merge all transactions
+        allTransactions = transactionArrays.flat();
+        console.log('Total transactions from all accounts:', allTransactions.length);
+        
+        // Sort by timestamp (most recent first)
+        allTransactions.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        
+        // Limit to requested number
+        allTransactions = allTransactions.slice(0, limit);
+      }
       
       // Cache transactions
-      await this.storage.saveTransactions(transactions);
+      await this.storage.saveTransactions(allTransactions);
       
-      return transactions;
+      return allTransactions;
     } catch (error) {
       console.error('Failed to get transactions:', error);
       // Return cached transactions if available

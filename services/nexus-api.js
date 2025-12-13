@@ -200,8 +200,11 @@ class NexusAPI {
 
   // Create a new account
   async createAccount(name, token = 'NXS', session, pin) {
+    console.log('[API] createAccount called with:');
+    console.log('  - name:', name);
+    console.log('  - token:', token);
+    
     const params = {
-      token,
       session,
       pin
     };
@@ -210,6 +213,13 @@ class NexusAPI {
     if (name) {
       params.name = name;
     }
+    
+    // Only include token if it's not NXS (let API default to NXS)
+    if (token && token !== '0' && token !== 'NXS') {
+      params.token = token;
+    }
+    
+    console.log('[API] createAccount params:', { ...params, pin: '***', session: '[REDACTED]' });
     
     return this.request('finance/create/account', params);
   }

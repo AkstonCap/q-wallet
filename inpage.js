@@ -101,9 +101,22 @@
     // Send NXS or tokens
     async sendTransaction({ from, to, amount, reference }) {
       try {
+        // Build params object with only defined values
+        const params = { to, amount };
+        
+        // Only include from if provided, otherwise backend will use 'default'
+        if (from !== undefined && from !== null && from !== '') {
+          params.from = from;
+        }
+        
+        // Only include reference if provided and not empty
+        if (reference !== undefined && reference !== null && reference !== '') {
+          params.reference = reference;
+        }
+        
         return await this.request({
           method: 'dapp.sendTransaction',
-          params: { from, to, amount, reference }
+          params
         });
       } catch (error) {
         console.error('Failed to send transaction:', error);
@@ -120,6 +133,20 @@
         });
       } catch (error) {
         console.error('Failed to send batch transactions:', error);
+        throw error;
+      }
+    }
+
+    // Execute batch API calls with single approval
+    // Each call: { endpoint: 'market/execute/order', params: {...} }
+    async executeBatchCalls(calls) {
+      try {
+        return await this.request({
+          method: 'dapp.executeBatchCalls',
+          params: { calls }
+        });
+      } catch (error) {
+        console.error('Failed to execute batch calls:', error);
         throw error;
       }
     }

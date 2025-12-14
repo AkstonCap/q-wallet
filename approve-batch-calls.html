@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Batch API Calls Request</title>
+  <link rel="stylesheet" href="styles/popup.css">
+  <style>
+    body {
+      width: 520px;
+      min-height: 700px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #ff6600, #cc5200);
+      color: white;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 18px;
+      margin-bottom: 5px;
+    }
+
+    .header .subtitle {
+      font-size: 12px;
+      opacity: 0.9;
+    }
+
+    .content {
+      padding: 20px;
+    }
+
+    .origin-box {
+      background: #fff3e0;
+      border: 1px solid #ffb74d;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+
+    .origin-label {
+      font-size: 11px;
+      color: #666;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .origin {
+      font-weight: 600;
+      color: #ff6600;
+      font-size: 14px;
+      word-break: break-all;
+    }
+
+    .calls-list {
+      background: #f5f5f5;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 16px;
+      max-height: 350px;
+      overflow-y: auto;
+    }
+
+    .call-item {
+      background: white;
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 8px;
+      border-left: 3px solid #ff6600;
+    }
+
+    .call-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .call-number {
+      font-size: 11px;
+      color: #999;
+      margin-bottom: 4px;
+    }
+
+    .call-endpoint {
+      font-weight: 600;
+      color: #333;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    .call-params {
+      font-size: 11px;
+      color: #666;
+      font-family: 'Courier New', monospace;
+      background: #f9f9f9;
+      padding: 6px;
+      border-radius: 4px;
+      max-height: 80px;
+      overflow-y: auto;
+      word-break: break-all;
+    }
+
+    .fee-info {
+      background: #e3f2fd;
+      border: 1px solid #64b5f6;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 16px;
+    }
+
+    .fee-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 13px;
+    }
+
+    .fee-label {
+      color: #666;
+    }
+
+    .fee-value {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .fee-note {
+      font-size: 11px;
+      color: #666;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #90caf9;
+    }
+
+    .pin-input-group {
+      margin-bottom: 16px;
+    }
+
+    .pin-input-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 8px;
+    }
+
+    .pin-input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-size: 16px;
+      text-align: center;
+      letter-spacing: 4px;
+    }
+
+    .pin-input:focus {
+      outline: none;
+      border-color: #ff6600;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 14px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-deny {
+      background: #f5f5f5;
+      color: #666;
+    }
+
+    .btn-deny:hover {
+      background: #e0e0e0;
+    }
+
+    .btn-approve {
+      background: #ff6600;
+      color: white;
+    }
+
+    .btn-approve:hover {
+      background: #cc5200;
+    }
+
+    .btn-approve:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .loading, .result {
+      display: none;
+      text-align: center;
+      padding: 30px;
+    }
+
+    .loading.show, .result.show {
+      display: block;
+    }
+
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #ff6600;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .result-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .result-message {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 16px;
+    }
+
+    .result-data {
+      font-size: 12px;
+      font-family: 'Courier New', monospace;
+      background: #f5f5f5;
+      padding: 12px;
+      border-radius: 6px;
+      max-height: 200px;
+      overflow-y: auto;
+      text-align: left;
+      word-break: break-all;
+    }
+
+    .btn-close {
+      margin-top: 16px;
+      padding: 12px 24px;
+      background: #ff6600;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🔐 Batch API Request</h1>
+    <div class="subtitle">Review and approve multiple API calls</div>
+  </div>
+
+  <div class="content">
+    <div class="origin-box">
+      <div class="origin-label">Requesting Site</div>
+      <div class="origin" id="origin">Loading...</div>
+    </div>
+
+    <div class="calls-list" id="calls-list">
+      <!-- Calls will be populated here -->
+    </div>
+
+    <div class="fee-info">
+      <div class="fee-row">
+        <span class="fee-label">Number of API calls:</span>
+        <span class="fee-value" id="total-calls">0</span>
+      </div>
+      <div class="fee-row">
+        <span class="fee-label">DIST Service Fee:</span>
+        <span class="fee-value" id="dist-fee">0 NXS</span>
+      </div>
+      <div class="fee-row">
+        <span class="fee-label">Nexus Network Fees:</span>
+        <span class="fee-value" id="nexus-fees">0.01 NXS per call</span>
+      </div>
+      <div class="fee-note">
+        ⓘ Nexus charges 0.01 NXS per API call made within 10 seconds of the first call. DIST service fee: 1 NXS (1-4 calls), 2 NXS (5-8 calls), 3 NXS (9-12 calls).
+      </div>
+    </div>
+
+    <div class="pin-input-group">
+      <label for="pin-input">Enter your PIN to approve</label>
+      <input 
+        type="password" 
+        id="pin-input" 
+        class="pin-input" 
+        placeholder="Enter PIN"
+        maxlength="8"
+        autocomplete="off"
+      >
+    </div>
+
+    <div class="buttons">
+      <button class="btn btn-deny" id="deny-btn">Deny</button>
+      <button class="btn btn-approve" id="approve-btn">Approve All Calls</button>
+    </div>
+  </div>
+
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <div>Processing API calls...</div>
+  </div>
+
+  <div class="result" id="result">
+    <div class="result-title" id="result-title"></div>
+    <div class="result-message" id="result-message"></div>
+    <div class="result-data" id="result-data"></div>
+    <button class="btn-close" id="close-btn">Close</button>
+  </div>
+
+  <script src="approve-batch-calls.js"></script>
+</body>
+</html>

@@ -18,8 +18,8 @@ document.addEventListener('DOMContentLoaded', () => {
     amount: params.get('amount')
   };
   
-  // Only include reference if it has a value
-  if (refParam && refParam.trim() && refParam !== 'None') {
+  // Only include reference if it has a valid value (not null, empty, 'None', or 'undefined')
+  if (refParam && refParam.trim() && refParam !== 'None' && refParam !== 'undefined' && refParam !== 'null') {
     transactionData.reference = refParam.trim();
   }
   

@@ -181,7 +181,7 @@ async function handleMessage(request, sender) {
       return await handleDAppConnection(sender, params);
     
     case 'dapp.getAccounts':
-      await checkDAppPermission(params.origin);
+      await checkDAppPermission(params.origin, sender.url);
       if (!wallet.isLoggedIn()) {
         throw new Error('Wallet not connected');
       }
@@ -189,14 +189,14 @@ async function handleMessage(request, sender) {
       return { result: [address] };
     
     case 'dapp.signTransaction':
-      await checkDAppPermission(params.origin);
+      await checkDAppPermission(params.origin, sender.url);
       return await handleSignTransaction(params);
     
     case 'dapp.sendTransaction':
       console.log('=== dapp.sendTransaction case triggered ===');
       console.log('Sender:', sender);
       console.log('Params:', params);
-      await checkDAppPermission(params.origin);
+      await checkDAppPermission(params.origin, sender.url);
       if (!wallet.isLoggedIn()) {
         throw new Error('Wallet not connected');
       }
@@ -207,12 +207,23 @@ async function handleMessage(request, sender) {
       console.log('=== dapp.sendBatchTransactions case triggered ===');
       console.log('Sender:', sender);
       console.log('Params:', params);
-      await checkDAppPermission(params.origin);
+      await checkDAppPermission(params.origin, sender.url);
       if (!wallet.isLoggedIn()) {
         throw new Error('Wallet not connected');
       }
       // Request batch transaction approval from user with single PIN
       return await handleDAppBatchTransaction(params);
+
+    case 'dapp.executeBatchCalls':
+      console.log('=== dapp.executeBatchCalls case triggered ===');
+      console.log('Sender:', sender);
+      console.log('Params:', params);
+      await checkDAppPermission(params.origin, sender.url);
+      if (!wallet.isLoggedIn()) {
+        throw new Error('Wallet not connected');
+      }
+      // Request batch API calls approval from user with single PIN
+      return await handleDAppBatchCalls(params);
 
     default:
       throw new Error(`Unknown method: ${method}`);
@@ -220,31 +231,40 @@ async function handleMessage(request, sender) {
 }
 
 // Check if dApp has permission
-async function checkDAppPermission(origin) {
+async function checkDAppPermission(origin, senderUrl = null) {
   const storage = new StorageService();
   
+  // For local files, use full URL instead of origin to distinguish between files
+  const identifier = (senderUrl && senderUrl.startsWith('file://')) ? senderUrl : origin;
+  
   // Check if blocked
-  const isBlocked = await storage.isDomainBlocked(origin);
+  const isBlocked = await storage.isDomainBlocked(identifier);
   if (isBlocked) {
     throw new Error('This domain has been blocked from accessing your wallet');
   }
   
   // Check if approved
-  const isApproved = await storage.isDomainApproved(origin);
+  const isApproved = await storage.isDomainApproved(identifier);
   if (!isApproved) {
     throw new Error('This domain is not approved. Please connect first.');
   }
 
   // Update activity timestamp for this domain
-  await storage.updateDomainActivity(origin);
+  await storage.updateDomainActivity(identifier);
 }
 
 // Handle DApp connection request
 async function handleDAppConnection(sender, params) {
   const { origin } = params;
   
+  // For local files, use full URL instead of origin to distinguish between files
+  const senderUrl = sender.url || origin;
+  const identifier = senderUrl.startsWith('file://') ? senderUrl : origin;
+  
   console.log('=== handleDAppConnection called ===');
   console.log('Origin:', origin);
+  console.log('Sender URL:', senderUrl);
+  console.log('Identifier:', identifier);
   console.log('Wallet exists:', !!wallet);
   console.log('Wallet isLoggedIn:', wallet ? wallet.isLoggedIn() : 'N/A');
   console.log('Wallet session:', wallet?.session);
@@ -257,16 +277,16 @@ async function handleDAppConnection(sender, params) {
   const storage = new StorageService();
   
   // Check if domain is blocked
-  const isBlocked = await storage.isDomainBlocked(origin);
+  const isBlocked = await storage.isDomainBlocked(identifier);
   if (isBlocked) {
     throw new Error('This domain has been blocked from connecting to your wallet');
   }
 
   // Check if already approved
-  const isApproved = await storage.isDomainApproved(origin);
+  const isApproved = await storage.isDomainApproved(identifier);
   if (isApproved) {
     // Update activity timestamp
-    await storage.updateDomainActivity(origin);
+    await storage.updateDomainActivity(identifier);
     
     const address = await wallet.getAccountAddress('default');
     return {
@@ -278,12 +298,12 @@ async function handleDAppConnection(sender, params) {
   }
 
   // Request user approval via notification
-  const approved = await requestUserApproval(origin);
+  const approved = await requestUserApproval(identifier);
   
   if (approved) {
-    await storage.addApprovedDomain(origin);
+    await storage.addApprovedDomain(identifier);
     // Set initial activity timestamp
-    await storage.updateDomainActivity(origin);
+    await storage.updateDomainActivity(identifier);
     
     const address = await wallet.getAccountAddress('default');
     return {
@@ -354,8 +374,45 @@ async function handleDAppTransaction(params) {
   console.log('=== handleDAppTransaction called ===');
   console.log('Params:', { origin, from, to, amount, reference });
   
+  // Validate required parameters
+  // Note: 'from' is optional and defaults to 'default'
+  if (!to) {
+    throw new Error('"to" parameter is required');
+  }
+  if (amount === undefined || amount === null) {
+    throw new Error('"amount" parameter is required');
+  }
+  
+  // Default 'from' to 'default' if not provided
+  const fromAccount = from || 'default';
+  
+  // Validate amount is a positive number
+  const numAmount = parseFloat(amount);
+  if (isNaN(numAmount) || numAmount <= 0) {
+    throw new Error('"amount" must be a positive number');
+  }
+  
+  // Validate reference if provided
+  let validatedReference = undefined;
+  if (reference !== undefined && reference !== null && reference !== '') {
+    const refString = String(reference).trim();
+    if (refString !== '') {
+      // Check if it's a valid 64-bit unsigned integer
+      try {
+        const refNum = BigInt(refString);
+        if (refNum < 0n || refNum > 18446744073709551615n) {
+          throw new Error('"reference" must be a 64-bit unsigned integer (0 to 18446744073709551615)');
+        }
+        validatedReference = refString;
+      } catch (err) {
+        if (err.message.includes('reference')) throw err;
+        throw new Error('"reference" must be a valid 64-bit unsigned integer');
+      }
+    }
+  }
+  
   // Create a unique key for this transaction request to prevent duplicates
-  const requestKey = `${origin}:${from}:${to}:${amount}:${reference}`;
+  const requestKey = `${origin}:${fromAccount}:${to}:${amount}:${reference}`;
   const now = Date.now();
   
   // Check if we've seen this exact request in the last 500ms
@@ -381,10 +438,10 @@ async function handleDAppTransaction(params) {
   console.log('Requesting transaction approval...');
   const approval = await requestTransactionApproval({
     origin,
-    from: from || 'default',
+    from: fromAccount,
     to,
-    amount,
-    reference: (reference && reference.trim()) ? reference.trim() : undefined
+    amount: numAmount,
+    reference: validatedReference
   });
   
   console.log('=== Approval received ===');
@@ -481,12 +538,45 @@ async function handleDAppBatchTransaction(params) {
   // Validate each transaction
   for (let i = 0; i < transactions.length; i++) {
     const tx = transactions[i];
-    if (!tx.to || !tx.amount) {
-      throw new Error(`Invalid transaction at index ${i}: 'to' and 'amount' are required`);
+    
+    // Validate required parameters (from is optional, defaults to 'default')
+    if (!tx.to) {
+      throw new Error(`Invalid transaction at index ${i}: "to" is required`);
     }
-    // Add default 'from' if not specified
+    if (tx.amount === undefined || tx.amount === null) {
+      throw new Error(`Invalid transaction at index ${i}: "amount" is required`);
+    }
+    
+    // Default 'from' to 'default' if not provided
     if (!tx.from) {
       transactions[i].from = 'default';
+    }
+    
+    // Validate amount
+    const numAmount = parseFloat(tx.amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      throw new Error(`Invalid transaction at index ${i}: "amount" must be a positive number`);
+    }
+    transactions[i].amount = numAmount;
+    
+    // Validate reference if provided
+    if (tx.reference !== undefined && tx.reference !== null && tx.reference !== '') {
+      const refString = String(tx.reference).trim();
+      if (refString !== '') {
+        try {
+          const refNum = BigInt(refString);
+          if (refNum < 0n || refNum > 18446744073709551615n) {
+            throw new Error('out of range');
+          }
+          transactions[i].reference = refString;
+        } catch (err) {
+          throw new Error(`Invalid transaction at index ${i}: "reference" must be a 64-bit unsigned integer (0 to 18446744073709551615)`);
+        }
+      } else {
+        delete transactions[i].reference; // Remove empty reference
+      }
+    } else {
+      delete transactions[i].reference; // Remove undefined/null reference
     }
   }
   
@@ -580,6 +670,153 @@ async function handleDAppBatchTransaction(params) {
   };
 }
 
+// Handle dApp batch API calls request
+async function handleDAppBatchCalls(params) {
+  const { origin, calls } = params;
+  
+  console.log('=== handleDAppBatchCalls called ===');
+  console.log('Origin:', origin);
+  console.log('Number of calls:', calls?.length);
+  console.log('Calls:', calls);
+  
+  // Validate input
+  if (!Array.isArray(calls) || calls.length === 0) {
+    throw new Error('Invalid batch: calls must be a non-empty array');
+  }
+  
+  if (calls.length > 12) {
+    throw new Error('Batch too large: maximum 12 API calls allowed');
+  }
+  
+  // Validate each call
+  for (let i = 0; i < calls.length; i++) {
+    const call = calls[i];
+    if (!call.endpoint || typeof call.endpoint !== 'string') {
+      throw new Error(`Invalid call at index ${i}: 'endpoint' is required and must be a string`);
+    }
+    if (!call.params || typeof call.params !== 'object') {
+      throw new Error(`Invalid call at index ${i}: 'params' is required and must be an object`);
+    }
+  }
+  
+  // Calculate DIST service fee based on number of calls
+  let distFee = 1; // 1-4 calls
+  if (calls.length >= 9) {
+    distFee = 3; // 9-12 calls
+  } else if (calls.length >= 5) {
+    distFee = 2; // 5-8 calls
+  }
+  
+  // Request user approval via popup
+  console.log('Requesting batch API calls approval...');
+  const approval = await requestBatchCallsApproval({
+    origin,
+    calls,
+    distFee
+  });
+  
+  console.log('=== Batch calls approval received ===');
+  console.log('Approval:', approval);
+  
+  if (!approval.approved) {
+    console.log('Batch calls rejected by user');
+    throw new Error('Batch API calls rejected by user');
+  }
+  
+  if (!approval.pin) {
+    console.log('ERROR: No PIN in approval');
+    throw new Error('PIN is required for API calls');
+  }
+  
+  // Verify wallet state
+  if (!wallet.session) {
+    throw new Error('Wallet session not available. Please log in again.');
+  }
+  
+  // Execute all API calls
+  console.log('=== Executing batch API calls ===');
+  const results = [];
+  const errors = [];
+  
+  for (let i = 0; i < calls.length; i++) {
+    const call = calls[i];
+    console.log(`Executing call ${i + 1}/${calls.length}: ${call.endpoint}`, call.params);
+    
+    try {
+      // Add session and pin to params
+      const callParams = {
+        ...call.params,
+        session: wallet.session,
+        pin: approval.pin
+      };
+      
+      // Execute the API call
+      const result = await wallet.api.request(call.endpoint, callParams);
+      console.log(`Call ${i + 1} successful:`, result);
+      results.push({ success: true, result, index: i, endpoint: call.endpoint });
+    } catch (err) {
+      console.error(`Call ${i + 1} failed:`, err.message);
+      errors.push({ success: false, error: err.message, index: i, endpoint: call.endpoint });
+      results.push({ success: false, error: err.message, index: i, endpoint: call.endpoint });
+      break; // Stop on first error
+    }
+  }
+  
+  // Charge DIST service fee if any calls succeeded
+  if (results.some(r => r.success)) {
+    const DISTORDIA_FEE_ADDRESS = '8Csmb3RP227N1NHJDH8QZRjZjobe4udaygp7aNv5VLPWDvLDVD7';
+    try {
+      await wallet.api.debit(
+        'default',
+        distFee,
+        DISTORDIA_FEE_ADDRESS,
+        approval.pin,
+        '',
+        wallet.session
+      );
+      console.log(`DIST service fee charged: ${distFee} NXS for ${calls.length} API calls`);
+    } catch (feeError) {
+      console.error('Failed to charge DIST service fee:', feeError);
+      // Don't fail the batch if fee payment fails
+    }
+  }
+  
+  // Send result back to popup window
+  if (approval.requestId) {
+    console.log('Broadcasting batch calls results:', { 
+      requestId: approval.requestId, 
+      totalSuccessful: results.filter(r => r.success).length,
+      totalFailed: errors.length
+    });
+    chrome.runtime.sendMessage({
+      type: 'BATCH_CALLS_RESULT',
+      requestId: approval.requestId,
+      success: errors.length === 0,
+      results: results,
+      totalCalls: calls.length,
+      successfulCalls: results.filter(r => r.success).length
+    }).catch((err) => {
+      console.log('Could not broadcast batch calls results:', err.message);
+    });
+    
+    // Give popup time to receive and display the result
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  
+  if (errors.length > 0) {
+    throw new Error(`Batch calls failed: ${errors.length} of ${calls.length} calls failed`);
+  }
+  
+  return { 
+    result: {
+      totalCalls: calls.length,
+      successfulCalls: results.filter(r => r.success).length,
+      results: results,
+      distFee: distFee
+    }
+  };
+}
+
 // Request user approval for dApp batch transaction
 async function requestBatchTransactionApproval(batchData) {
   return new Promise((resolve, reject) => {
@@ -642,6 +879,69 @@ async function requestBatchTransactionApproval(batchData) {
   });
 }
 
+// Request user approval for dApp batch API calls
+async function requestBatchCallsApproval(batchData) {
+  return new Promise((resolve, reject) => {
+    const requestId = Date.now().toString();
+    console.log('Requesting batch API calls approval:', batchData, 'requestId:', requestId);
+    
+    // Store the pending request
+    pendingTransactionApprovals.set(requestId, { 
+      batchData, 
+      resolve, 
+      reject,
+      requestId
+    });
+    
+    // Create popup window for batch approval
+    const width = 520;
+    const height = 700;
+    
+    // Build URL with batch parameters (encode as JSON)
+    const params = new URLSearchParams({
+      requestId,
+      origin: batchData.origin,
+      calls: JSON.stringify(batchData.calls),
+      distFee: batchData.distFee
+    });
+    
+    chrome.windows.create({
+      url: `approve-batch-calls.html?${params.toString()}`,
+      type: 'popup',
+      width: width,
+      height: height,
+      focused: true
+    }, (window) => {
+      if (chrome.runtime.lastError) {
+        console.error('Failed to create batch calls approval window:', chrome.runtime.lastError);
+        pendingTransactionApprovals.delete(requestId);
+        reject(new Error('Unable to show batch calls approval dialog'));
+        return;
+      }
+      
+      console.log('Batch calls approval window created:', window.id);
+      
+      // Store window ID with the request
+      const pending = pendingTransactionApprovals.get(requestId);
+      if (pending) {
+        pending.windowId = window.id;
+      }
+      
+      // Add timeout - auto-deny after 3 minutes
+      setTimeout(() => {
+        if (pendingTransactionApprovals.has(requestId)) {
+          console.warn('Batch calls approval timed out');
+          pendingTransactionApprovals.delete(requestId);
+          reject(new Error('Batch calls approval request timed out'));
+          
+          // Close the window if still open
+          chrome.windows.remove(window.id).catch(() => {});
+        }
+      }, 180000);
+    });
+  });
+}
+
 // Request user approval for dApp transaction
 async function requestTransactionApproval(transactionData) {
   return new Promise((resolve, reject) => {
@@ -672,9 +972,13 @@ async function requestTransactionApproval(transactionData) {
       origin: transactionData.origin,
       from: transactionData.from,
       to: transactionData.to,
-      amount: transactionData.amount,
-      reference: transactionData.reference
+      amount: transactionData.amount
     });
+    
+    // Only add reference if it's defined
+    if (transactionData.reference !== undefined && transactionData.reference !== null) {
+      params.set('reference', transactionData.reference);
+    }
     
     chrome.windows.create({
       url: `approve-transaction.html?${params.toString()}`,

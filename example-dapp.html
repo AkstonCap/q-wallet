@@ -209,6 +209,36 @@
       </div>
     </div>
 
+    <!-- Section 6: Batch API Calls -->
+    <div class="section">
+      <h2>6. Batch API Calls (Multiple Operations)</h2>
+      <p>Execute multiple different API operations with a single approval. Supports up to 12 API calls per batch.</p>
+      
+      <div class="form-group">
+        <div class="label">Example: Market Orders + Finance Debit</div>
+        <p style="font-size: 14px; color: #666; margin-bottom: 12px;">
+          This example will execute 4 API calls:
+          <br>• market/execute/order (Order 1)
+          <br>• market/execute/order (Order 2)
+          <br>• market/create/bid
+          <br>• finance/debit/account (Fee payment)
+        </p>
+      </div>
+      
+      <button id="batch-calls-btn" onclick="executeBatchCalls()" disabled style="background: #9c27b0;">Execute Batch API Calls</button>
+      
+      <div id="batch-calls-result" style="display: none;">
+        <div class="label">Batch Calls Result:</div>
+        <div class="info-item" id="batch-calls-data"></div>
+      </div>
+
+      <div style="background: #e3f2fd; padding: 12px; border-radius: 6px; margin-top: 16px; font-size: 13px;">
+        <strong>ℹ️ Fees:</strong>
+        <br>• DIST Service: 1 NXS (1-4 calls), 2 NXS (5-8 calls), 3 NXS (9-12 calls)
+        <br>• Nexus Network: 0.01 NXS per call (within 10 seconds of first call)
+      </div>
+    </div>
+
     <!-- Code Example -->
     <div class="section">
       <h3>Developer Reference</h3>
@@ -233,11 +263,20 @@ if (typeof window.nexus !== 'undefined') {
   
   // Send batch transactions (NEW!)
   const batchResult = await window.nexus.sendBatchTransactions([
-    { to: 'address1', amount: 5.0, reference: 'Order #1' },
-    { to: 'address2', amount: 3.5, reference: 'Order #2' },
-    { to: 'address3', amount: 1.5, reference: 'Order #3' }
+    { to: 'address1', amount: 5.0, reference: 1 },
+    { to: 'address2', amount: 3.5, reference: 2 },
+    { to: 'address3', amount: 1.5, reference: 3 }
   ]);
   console.log('Batch result:', batchResult);
+  
+  // Execute batch API calls (NEW!)
+  const batchCallsResult = await window.nexus.executeBatchCalls([
+    { endpoint: 'market/execute/order', params: { txid: '0123...abcdef', from: 'default', to: 'default' } },
+    { endpoint: 'market/execute/order', params: { txid: 'fedc...987654', from: 'default', to: 'default' } },
+    { endpoint: 'market/create/bid', params: { market: 'NXS/USD', amount: 10, price: 1.5, from: 'default', to: 'usd' } },
+    { endpoint: 'finance/debit/account', params: { from: 'default', to: 'fee-address', amount: 0.1 } }
+  ]);
+  console.log('Batch calls result:', batchCallsResult);
 }</code></pre>
     </div>
   </div>
@@ -306,6 +345,8 @@ if (typeof window.nexus !== 'undefined') {
       document.getElementById('balance-btn').disabled = true;
       document.getElementById('send-btn').disabled = true;
       document.getElementById('history-btn').disabled = true;
+      document.getElementById('batch-send-btn').disabled = true;
+      document.getElementById('batch-calls-btn').disabled = true;
       
       alert('Disconnected! To fully revoke this site\'s access, go to your wallet and navigate to Settings → Connected Sites → Revoke');
     }
@@ -332,6 +373,7 @@ if (typeof window.nexus !== 'undefined') {
           document.getElementById('send-btn').disabled = false;
           document.getElementById('history-btn').disabled = false;
           document.getElementById('batch-send-btn').disabled = false;
+          document.getElementById('batch-calls-btn').disabled = false;
         } else {
           updateStatus('Wallet not connected. Click "Connect Wallet" button.', '');
           
@@ -373,11 +415,17 @@ if (typeof window.nexus !== 'undefined') {
 
         updateStatus('Sending transaction...', '');
         
-        const result = await window.nexus.sendTransaction({
+        // Build transaction object, omitting reference if empty
+        const txParams = {
           to: to,
-          amount: amount,
-          reference: reference
-        });
+          amount: amount
+        };
+        
+        if (reference) {
+          txParams.reference = reference;
+        }
+        
+        const result = await window.nexus.sendTransaction(txParams);
 
         document.getElementById('tx-data').textContent = JSON.stringify(result, null, 2);
         document.getElementById('tx-result').style.display = 'block';
@@ -430,11 +478,17 @@ if (typeof window.nexus !== 'undefined') {
           const reference = document.getElementById(`batch-ref-${i}`).value.trim();
           
           if (to && amount && amount > 0) {
-            transactions.push({
+            // Build transaction object, omitting reference if empty
+            const tx = {
               to: to,
-              amount: amount,
-              reference: reference || undefined
-            });
+              amount: amount
+            };
+            
+            if (reference) {
+              tx.reference = reference;
+            }
+            
+            transactions.push(tx);
           }
         }
         
@@ -460,6 +514,61 @@ if (typeof window.nexus !== 'undefined') {
       } catch (error) {
         console.error('Batch transaction failed:', error);
         updateStatus('Batch transaction failed: ' + error.message, 'error');
+      }
+    }
+
+    // Execute batch API calls
+    async function executeBatchCalls() {
+      try {
+        updateStatus('Executing batch API calls...', '');
+        
+        // Example batch: market orders + finance debit
+        const calls = [
+          {
+            endpoint: 'market/execute/order',
+            params: {
+              txid: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+              from: 'default',
+              to: 'account2'
+              // Note: This is just an example - you'd need a real order txid
+            }
+          },
+          {
+            endpoint: 'market/execute/order',
+            params: {
+              txid: 'fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210',
+              from: 'default',
+              to: 'account2'
+            }
+          },
+          {
+            endpoint: 'market/create/bid',
+            params: {
+              market: 'NXS/USD',
+              amount: 10.0,
+              price: 1.50,
+              from: 'default',
+              to: 'account2'
+            }
+          },
+          {
+            endpoint: 'finance/debit/account',
+            params: {
+              from: 'default',
+              to: '8Csmb3RP227N1NHJDH8QZRjZjobe4udaygp7aNv5VLPWDvLDVD7',
+              amount: 0.5
+            }
+          }
+        ];
+        
+        const result = await window.nexus.executeBatchCalls(calls);
+        
+        document.getElementById('batch-calls-data').textContent = JSON.stringify(result, null, 2);
+        document.getElementById('batch-calls-result').style.display = 'block';
+        updateStatus(`Batch calls successful! ${result.successfulCalls}/${result.totalCalls} completed. DIST fee: ${result.distFee} NXS`, 'connected');
+      } catch (error) {
+        console.error('Batch calls failed:', error);
+        updateStatus('Batch calls failed: ' + error.message, 'error');
       }
     }
 

@@ -98,6 +98,24 @@
       }
     }
 
+    // Disconnect from wallet (revoke site's own connection)
+    async disconnect() {
+      try {
+        const result = await this.request({
+          method: 'dapp.disconnect',
+          params: {}
+        });
+        
+        this.isConnected = false;
+        this.selectedAddress = null;
+        
+        return result;
+      } catch (error) {
+        console.error('Failed to disconnect from Nexus wallet:', error);
+        throw error;
+      }
+    }
+
     // Send NXS or tokens
     async sendTransaction({ from, to, amount, reference }) {
       try {

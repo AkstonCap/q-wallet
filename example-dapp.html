@@ -327,28 +327,50 @@ if (typeof window.nexus !== 'undefined') {
     }
 
     // Disconnect wallet
-    function disconnectWallet() {
-      connectedAccount = null;
-      
-      // Update UI
-      updateStatus('Wallet disconnected. Note: To fully revoke access, go to wallet Settings → Connected Sites', '');
-      document.getElementById('account-info').style.display = 'none';
-      document.getElementById('balance-info').style.display = 'none';
-      document.getElementById('tx-info').style.display = 'none';
-      document.getElementById('history-info').style.display = 'none';
-      
-      // Show connect button, hide disconnect button
-      document.getElementById('connect-btn').style.display = 'inline-block';
-      document.getElementById('disconnect-btn').style.display = 'none';
-      
-      // Disable buttons
-      document.getElementById('balance-btn').disabled = true;
-      document.getElementById('send-btn').disabled = true;
-      document.getElementById('history-btn').disabled = true;
-      document.getElementById('batch-send-btn').disabled = true;
-      document.getElementById('batch-calls-btn').disabled = true;
-      
-      alert('Disconnected! To fully revoke this site\'s access, go to your wallet and navigate to Settings → Connected Sites → Revoke');
+    // Disconnect from wallet
+    async function disconnectWallet() {
+      try {
+        if (!await checkWalletInstalled()) return;
+
+        updateStatus('Disconnecting...', '');
+        
+        // Call wallet disconnect method
+        await window.nexus.disconnect();
+        
+        connectedAccount = null;
+        
+        // Update UI
+        updateStatus('Wallet disconnected successfully!', '');
+        
+        // Hide all info sections (with null checks)
+        const elementsToHide = [
+          'account-info', 'balance-info', 'tx-result', 
+          'history-info', 'batch-result', 'batch-calls-result'
+        ];
+        elementsToHide.forEach(id => {
+          const element = document.getElementById(id);
+          if (element) element.style.display = 'none';
+        });
+        
+        // Show connect button, hide disconnect button
+        document.getElementById('connect-btn').style.display = 'inline-block';
+        document.getElementById('disconnect-btn').style.display = 'none';
+        
+        // Disable buttons
+        const buttonsToDisable = [
+          'balance-btn', 'send-btn', 'history-btn', 
+          'batch-send-btn', 'batch-calls-btn'
+        ];
+        buttonsToDisable.forEach(id => {
+          const button = document.getElementById(id);
+          if (button) button.disabled = true;
+        });
+        
+        alert('Successfully disconnected from Q-Wallet!');
+      } catch (error) {
+        console.error('Disconnect failed:', error);
+        updateStatus('Disconnect failed: ' + error.message, 'error');
+      }
     }
 
     // Check connection status

@@ -225,8 +225,36 @@ async function handleMessage(request, sender) {
       // Request batch API calls approval from user with single PIN
       return await handleDAppBatchCalls(params);
 
+    case 'dapp.disconnect':
+      console.log('=== dapp.disconnect case triggered ===');
+      console.log('Sender:', sender);
+      console.log('Origin:', params.origin);
+      // Allow site to disconnect itself without approval
+      return await handleDAppDisconnect(params.origin, sender.url);
+
     default:
       throw new Error(`Unknown method: ${method}`);
+  }
+}
+
+// Handle dApp disconnection (site disconnects itself)
+async function handleDAppDisconnect(origin, senderUrl = null) {
+  const storage = new StorageService();
+  
+  // For local files, use full URL instead of origin to distinguish between files
+  const identifier = (senderUrl && senderUrl.startsWith('file://')) ? senderUrl : origin;
+  
+  console.log('Disconnecting dApp:', identifier);
+  
+  try {
+    // Remove from approved domains
+    await storage.removeApprovedDomain(identifier);
+    console.log('Successfully disconnected:', identifier);
+    
+    return { result: { success: true, disconnected: true } };
+  } catch (error) {
+    console.error('Failed to disconnect dApp:', error);
+    throw new Error('Failed to disconnect: ' + error.message);
   }
 }
 

@@ -330,6 +330,19 @@ Check if wallet is currently connected.
 const connected = await window.nexus.isWalletConnected();
 ```
 
+### window.nexus.disconnect()
+Disconnect the site from the wallet. This revokes the site's own connection without requiring user approval.
+
+**Returns:** `Promise<object>` - Result with success status
+
+**Example:**
+```javascript
+await window.nexus.disconnect();
+console.log('Successfully disconnected from wallet');
+```
+
+**Note:** This allows a site to programmatically disconnect itself. Users can also revoke connections manually from the wallet Settings → Connected Sites.
+
 ## Error Handling
 
 Always wrap wallet calls in try-catch blocks and handle errors appropriately:
@@ -377,7 +390,22 @@ async function ensureConnection() {
 }
 ```
 
-### 3. Validate User Input
+### 3. Provide Disconnect Option
+
+```javascript
+// Add a disconnect button for users who want to disconnect your site
+async function handleDisconnect() {
+  try {
+    await window.nexus.disconnect();
+    alert('Successfully disconnected from wallet');
+    // Update UI to show disconnected state
+  } catch (error) {
+    console.error('Disconnect failed:', error);
+  }
+}
+```
+
+### 4. Validate User Input
 
 ```javascript
 async function sendTransaction() {

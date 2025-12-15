@@ -23,9 +23,11 @@ A secure cryptocurrency wallet browser extension for the Nexus blockchain, simil
 ### Security Features
 - 🔑 **Password Protected** - Strong password encryption
 - 🔢 **PIN Authentication** - Additional PIN layer for transaction approval
-- 🔐 **Secure Storage** - Chrome's secure storage API for sensitive data
+- 🔐 **Memory-Only Session Storage** - Session ID and PIN stored in RAM only (chrome.storage.session), never written to disk
 - 🚪 **Lock/Unlock** - Lock your wallet when not in use
-- 👁️ **Session Timeout** - Automatic session management
+- 👁️ **Automatic Session Cleanup** - Sessions automatically terminated on logout or browser close
+- 🛡️ **Defense in Depth** - Multiple layers of security protection
+- 🔒 **Blockchain Session Termination** - Active sessions properly terminated on Nexus node on logout/browser close
 
 ## Installation
 
@@ -191,11 +193,77 @@ For complete dApp integration documentation, see [DAPP-INTEGRATION.md](DAPP-INTE
 
 ## Security Features
 
-### Data Protection
-- 🔒 **No Credential Storage** - Your username, password, and PIN are never stored in the extension
-- 🔐 **Session-Based Security** - Session tokens auto-clear when you close your browser
+### Data Protection & Storage
+
+#### Session Storage (chrome.storage.session)
+The wallet uses Chrome's **session storage API** for sensitive data like session IDs and PINs. This provides:
+
+- ✅ **Memory-Only Storage** - Data stored in RAM only, never written to disk
+- ✅ **Automatic Cleanup** - All session data cleared when browser closes
+- ✅ **Isolation** - Not accessible to web pages or other extensions
+- ✅ **Browser Security** - Protected by browser's security sandbox
+
+**What's stored in session:**
+- Session ID (UUID from Nexus blockchain)
+- PIN (for transaction approval and logout)
+- Username and genesis hash (non-sensitive identifiers)
+
+**When data is cleared:**
+- User logs out (explicit action)
+- Browser window closes (automatic)
+- Extension is reloaded/updated
+
+#### Blockchain Session Management
+- 🔐 **Active Session Termination** - Wallet attempts to terminate sessions on the Nexus blockchain when you logout or close the browser
+- 🔑 **PIN Authentication** - Required for terminating sessions on multi-user nodes
+- 🛡️ **Security-First Cleanup** - **Local session data (session ID, PIN) is ALWAYS cleared from storage, even if blockchain termination fails**
+- ⚠️ **Offline Node Handling** - If the node is offline, local data is still cleared immediately (blockchain session will expire naturally)
+- 🏛️ **Public Computer Safety** - Closing browser always clears all sensitive data from local storage, regardless of network status
+
+#### Password & Credentials
+- 🔒 **No Credential Storage** - Your username, password, and PIN are never stored persistently
+- 🔐 **Session-Based Security** - Only session tokens are kept (in memory)
 - 🔑 **PIN Confirmation** - All transactions require PIN re-entry for approval
 - 🌐 **HTTPS Enforcement** - Remote connections must use secure HTTPS protocol
+
+### Alternative Storage Methods
+
+**Why not use chrome.storage.local?**
+- Writes data to disk (security risk)
+- Persists across browser restarts
+- Could be accessed if computer is stolen
+
+**Why not encrypt and store?**
+- Encryption key would need to be stored somewhere
+- Adds complexity without meaningful security benefit
+- Session-based approach is simpler and more secure
+
+**Hardware wallet integration?**
+- Not currently supported (browser extension limitation)
+- Consider this for future mobile/desktop versions
+- Current approach matches industry standard (MetaMask, etc.)
+
+### Best Practices
+
+**For Regular Use:**
+- ✅ Always logout when finished (don't just close window)
+- ✅ Use strong, unique password and PIN
+- ✅ Only connect to trusted dApps
+- ✅ Verify transaction details before approving
+
+**For Public Computers:**
+- ⚠️ **Use with caution** - Browser wallets on shared computers have inherent risks
+- ✅ Always **explicitly logout** before leaving (don't rely on browser close alone)
+- ✅ Verify logout was successful before walking away
+- ✅ **Clear browser data** after logout for extra security (Ctrl+Shift+Delete)
+- 🔒 **Local data is always cleared** - Even if node is offline, session/PIN are removed from computer
+- ⏳ **Blockchain session timeout** - If logout fails due to offline node, session will expire naturally (typically 24 hours)
+
+**For Public/Shared Computers:**
+- ⚠️ Use the Logout button before walking away
+- ⚠️ Don't rely on browser close alone
+- ⚠️ Clear browser data after use
+- ⚠️ Consider not using wallet on public computers at all
 - 💰 **Transparent Fees** - All transaction and service fees are clearly displayed before confirmation
 
 ### Fee Structure

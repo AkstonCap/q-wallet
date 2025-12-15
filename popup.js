@@ -1433,7 +1433,21 @@ async function handleLogout() {
       console.log('All dApp connections revoked');
     }
     
-    await wallet.logout();
+    // Use message passing to ensure background script wallet is also updated
+    const response = await chrome.runtime.sendMessage({
+      method: 'wallet.logout'
+    });
+    
+    if (response.error) {
+      throw new Error(response.error);
+    }
+    
+    // Also clear local wallet instance
+    wallet.session = null;
+    wallet.genesis = null;
+    wallet.username = null;
+    wallet.isLocked = true;
+    
     stopAutoRefresh();
     console.log('Logout successful, switching to login screen');
     showScreen('login');

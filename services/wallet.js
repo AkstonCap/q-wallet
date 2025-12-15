@@ -184,6 +184,10 @@ class WalletService {
         await this.api.unlockSession(pin, this.session);
         this.isLocked = false;
         console.log('Session unlocked successfully');
+        
+        // Save PIN in session storage for session termination on logout/browser close
+        await this.storage.savePin(pin);
+        console.log('PIN saved to session storage');
       } catch (unlockError) {
         console.warn('Could not unlock session immediately:', unlockError.message);
         this.isLocked = true;
@@ -234,6 +238,9 @@ class WalletService {
       this.isLocked = false;
       console.log('isLocked set to: false');
 
+      // Save PIN in session storage for session termination on browser close
+      await this.storage.savePin(pin);
+
       // Update session in sessionStorage
       const sessionToSave = {
         session: this.session,
@@ -277,22 +284,74 @@ class WalletService {
   }
 
   // Logout
-  async logout() {
-    try {
-      if (this.session) {
-        await this.api.terminateSession(this.session);
+  async logout(pin) {
+    console.log('=== Logout called ===');
+    console.log('Current wallet state:', {
+      hasSession: !!this.session,
+      session: this.session ? '[PRESENT]' : '[NULL]',
+      hasGenesiss: !!this.genesis,
+      username: this.username || '[NULL]',
+      isLocked: this.isLocked
+    });
+    
+    if (this.session) {
+      console.log('Logout: Attempting to terminate session');
+      
+      // Get PIN from parameter or storage
+      let pinToUse = pin;
+      if (!pinToUse) {
+        pinToUse = await this.storage.getPin();
+        console.log('Logout: Retrieved PIN from storage:', !!pinToUse);
       }
-    } catch (error) {
-      console.error('Failed to terminate session:', error);
+      
+      if (!pinToUse) {
+        // PIN not available - this can happen if user logged in with old code
+        // For now, we'll skip blockchain termination and just clear local state
+        console.warn('Logout: PIN not available in storage - session will not be terminated on blockchain');
+        console.warn('Logout: The session will timeout naturally on the blockchain');
+      } else {
+        try {
+          // Terminate with PIN for multi-user nodes
+          console.log('Logout: Calling sessions/terminate/local API...');
+          const response = await this.api.request('sessions/terminate/local', {
+            pin: pinToUse,
+            session: this.session
+          });
+          console.log('Logout: Session termination API response:', response);
+          
+          if (!response.result || !response.result.success) {
+            console.warn('Logout: Session termination returned unsuccessful response');
+            console.warn('Logout: Local data will be cleared anyway for security');
+          } else {
+            console.log('Logout: Session terminated successfully on blockchain');
+          }
+        } catch (error) {
+          // SECURITY: Always clear local data, even if blockchain termination fails
+          // This is critical for public computers and offline scenarios
+          if (error.message.includes('Session not found')) {
+            console.log('Logout: Session already terminated (this is okay for duplicate logout calls)');
+          } else {
+            console.error('Logout: Failed to terminate session on blockchain:', error.message);
+            console.warn('Logout: Local data will be cleared anyway for security');
+            console.warn('Logout: Blockchain session may remain active until it expires naturally');
+          }
+          // Do NOT re-throw - continue with local cleanup
+        }
+      }
+    } else {
+      console.log('Logout: No active session to terminate (this.session is null)');
     }
 
-    // Clear session data
+    // SECURITY: Always clear session data (including PIN) from local storage
+    // This happens regardless of blockchain termination success
+    // Local machine security takes priority over remote session cleanup
     this.session = null;
     this.genesis = null;
     this.username = null;
     this.isLocked = true;
 
     await this.storage.clearSession();
+    console.log('Logout: Session data securely cleared from local storage');
     
     return { success: true };
   }

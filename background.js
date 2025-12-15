@@ -8,6 +8,7 @@ let wallet;
 const pendingApprovals = new Map(); // Store pending connection approval requests
 const pendingTransactionApprovals = new Map(); // Store pending transaction approval requests
 const recentTransactionRequests = new Map(); // Track recent transaction requests to prevent duplicates
+const recentConnectionRequests = new Map(); // Track recent connection requests to prevent duplicates
 
 // Initialize on install
 chrome.runtime.onInstalled.addListener(async () => {
@@ -140,6 +141,8 @@ async function handleMessage(request, sender) {
       return { result: await wallet.login(params.username, params.password, params.pin) };
     
     case 'wallet.logout':
+      // Re-initialize wallet to load current session from storage before logging out
+      await wallet.initialize();
       return { result: await wallet.logout() };
     
     case 'wallet.lock':
@@ -325,24 +328,46 @@ async function handleDAppConnection(sender, params) {
     };
   }
 
-  // Request user approval via notification
-  const approved = await requestUserApproval(identifier);
-  
-  if (approved) {
-    await storage.addApprovedDomain(identifier);
-    // Set initial activity timestamp
-    await storage.updateDomainActivity(identifier);
-    
-    const address = await wallet.getAccountAddress('default');
-    return {
-      result: {
-        connected: true,
-        accounts: [address]
-      }
-    };
-  } else {
-    throw new Error('User denied connection request');
+  // Check if there's already a pending approval for this domain
+  const pendingKey = `connection:${identifier}`;
+  const existingPending = recentConnectionRequests.get(pendingKey);
+  if (existingPending) {
+    console.log('Connection request already pending for:', identifier, 'waiting for result...');
+    // Wait for the existing request to complete instead of throwing error
+    return existingPending;
   }
+  
+  // Create a promise for this connection request
+  const connectionPromise = (async () => {
+    try {
+      // Request user approval via notification
+      const approved = await requestUserApproval(identifier);
+      
+      if (approved) {
+        await storage.addApprovedDomain(identifier);
+        // Set initial activity timestamp
+        await storage.updateDomainActivity(identifier);
+        
+        const address = await wallet.getAccountAddress('default');
+        return {
+          result: {
+            connected: true,
+            accounts: [address]
+          }
+        };
+      } else {
+        throw new Error('User denied connection request');
+      }
+    } finally {
+      // Clean up pending marker
+      recentConnectionRequests.delete(pendingKey);
+    }
+  })();
+  
+  // Store the promise so duplicate requests can wait for this one
+  recentConnectionRequests.set(pendingKey, connectionPromise);
+  
+  return connectionPromise;
 }
 
 // Request user approval for dApp connection
@@ -1205,22 +1230,62 @@ async function cleanupSession(reason = 'unknown') {
     }
     
     // Step 2: Terminate session on blockchain node (if logged in)
-    if (wallet && wallet.isLoggedIn()) {
+    // Load session from storage since wallet object might not have it
+    let sessionToTerminate = wallet?.session;
+    
+    if (!sessionToTerminate) {
       try {
-        const sessionInfo = wallet.getSessionInfo();
-        if (sessionInfo && sessionInfo.session) {
-          const nodeUrl = await storage.getNodeUrl();
-          const api = new NexusAPI(nodeUrl);
-          await api.terminateSession(sessionInfo.session);
-          console.log(`Nexus session terminated on ${reason}`);
-        }
+        const sessionData = await storage.getSession();
+        sessionToTerminate = sessionData?.session;
+        console.log('Session loaded from storage for termination:', {
+          hasSessionData: !!sessionData,
+          hasSession: !!sessionToTerminate
+        });
       } catch (error) {
-        console.error('Failed to terminate Nexus session:', error);
-        // Continue with storage cleanup even if termination fails
+        console.log('Could not load session from storage:', error.message);
       }
     }
     
-    // Step 3: Securely clear session from storage
+    console.log('Checking wallet state for session termination:', {
+      walletExists: !!wallet,
+      hasSession: !!sessionToTerminate,
+      sessionValue: sessionToTerminate ? '[PRESENT]' : '[NULL]'
+    });
+    
+    if (sessionToTerminate) {
+      try {
+        // Get PIN from session storage for authentication
+        const pin = await storage.getPin();
+        if (!pin) {
+          console.log('No PIN available for session termination - session likely already terminated via logout');
+        } else {
+          const nodeUrl = await storage.getNodeUrl();
+          const api = new NexusAPI(nodeUrl);
+          console.log('Attempting to terminate Nexus session with PIN authentication...');
+          // Terminate session with PIN for multi-user nodes
+          const response = await api.request('sessions/terminate/local', { 
+            pin: pin,
+            session: sessionToTerminate 
+          });
+          console.log(`Session termination API response:`, response);
+          console.log(`Nexus session terminated on ${reason}`);
+        }
+      } catch (error) {
+        // SECURITY: Log error but continue with cleanup
+        // Local storage must be cleared even if blockchain termination fails
+        // This is critical for public computers and offline node scenarios
+        console.error('Failed to terminate Nexus session:', error);
+        console.warn('Local storage will be cleared anyway for security');
+        console.warn('Blockchain session may remain active until it expires naturally');
+        // Continue with storage cleanup below
+      }
+    } else {
+      console.log('Skipping session termination: no active session found');
+    }
+    
+    // Step 3: SECURITY - Always clear session from local storage
+    // This happens regardless of blockchain termination success
+    // Local machine security takes priority over remote session cleanup
     await storage.clearSession();
     
     // Step 4: Clear any remaining session-prefixed data (fallback mode)

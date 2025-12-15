@@ -4,6 +4,13 @@
 (function() {
   'use strict';
 
+  // Guard against multiple injections
+  if (window.__NEXUS_WALLET_CONTENT_INJECTED__) {
+    console.log('Nexus Wallet content script already injected, skipping');
+    return;
+  }
+  window.__NEXUS_WALLET_CONTENT_INJECTED__ = true;
+
   // Inject the inpage script into the page context
   const container = document.head || document.documentElement;
   const script = document.createElement('script');

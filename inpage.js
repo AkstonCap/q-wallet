@@ -4,6 +4,13 @@
 (function() {
   'use strict';
 
+  // Guard against multiple injections
+  if (window.__NEXUS_WALLET_PROVIDER_INJECTED__) {
+    console.log('Nexus Provider already injected, skipping');
+    return;
+  }
+  window.__NEXUS_WALLET_PROVIDER_INJECTED__ = true;
+
   // Create Nexus Provider
   class NexusProvider {
     constructor() {

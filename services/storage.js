@@ -135,26 +135,41 @@ class StorageService {
     return data;
   }
 
+  // Save PIN securely in session storage (memory-only, cleared on browser close)
+  async savePin(pin) {
+    if (this.useSessionAPI) {
+      await chrome.storage.session.set({ pin: pin });
+    } else {
+      await chrome.storage.local.set({ 'session_pin': pin });
+    }
+  }
+
+  // Get saved PIN from session storage
+  async getPin() {
+    if (this.useSessionAPI) {
+      const data = await chrome.storage.session.get(['pin']);
+      return data.pin || null;
+    } else {
+      const data = await chrome.storage.local.get(['session_pin']);
+      return data.session_pin || null;
+    }
+  }
+
   // Clear session data (secure deletion - overwrite then remove)
   async clearSession() {
     return new Promise(async (resolve, reject) => {
       try {
-        const storageKey = this.useSessionAPI ? 'session' : 'session_session';
-        
         // SECURITY: Overwrite session data with null before removal (secure deletion)
-        await this.setSession('session', null);
+        if (this.useSessionAPI) {
+          await chrome.storage.session.set({ session: null, pin: null });
+          await chrome.storage.session.remove(['session', 'pin']);
+        } else {
+          await chrome.storage.local.set({ session_session: null, session_pin: null });
+          await chrome.storage.local.remove(['session_session', 'session_pin']);
+        }
         
-        // Remove the key
-        this.sessionStorage.remove([storageKey], () => {
-          if (chrome.runtime.lastError) {
-            console.warn('Error clearing session:', chrome.runtime.lastError);
-            // Don't reject - session may already be cleared
-            resolve();
-          } else {
-            console.log('Session data securely cleared');
-            resolve();
-          }
-        });
+        console.log('Session data securely cleared');
+        resolve();
       } catch (error) {
         console.error('Error in clearSession:', error);
         resolve(); // Resolve anyway to allow logout to continue

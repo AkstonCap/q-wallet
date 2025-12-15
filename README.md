@@ -23,7 +23,8 @@ A secure cryptocurrency wallet browser extension for the Nexus blockchain, simil
 ### Security Features
 - 🔑 **Password Protected** - Strong password encryption
 - 🔢 **PIN Authentication** - Additional PIN layer for transaction approval
-- 🔐 **Memory-Only Session Storage** - Session ID and PIN stored in RAM only (chrome.storage.session), never written to disk
+- 🔐 **Memory-Only Session Storage** - Session ID and PIN stored in chrome.storage.session (RAM only), NEVER written to disk
+- 🔒 **Encrypted Fallback** - If browser doesn't support session storage, uses memory-only encryption key (lost on reload)
 - 🚪 **Lock/Unlock** - Lock your wallet when not in use
 - 👁️ **Automatic Session Cleanup** - Sessions automatically terminated on logout or browser close
 - 🛡️ **Defense in Depth** - Multiple layers of security protection
@@ -196,12 +197,19 @@ For complete dApp integration documentation, see [DAPP-INTEGRATION.md](DAPP-INTE
 ### Data Protection & Storage
 
 #### Session Storage (chrome.storage.session)
+#### Session Storage (chrome.storage.session)
 The wallet uses Chrome's **session storage API** for sensitive data like session IDs and PINs. This provides:
 
-- ✅ **Memory-Only Storage** - Data stored in RAM only, never written to disk
+- ✅ **Memory-Only Storage** - Data stored in RAM only, NEVER written to disk
 - ✅ **Automatic Cleanup** - All session data cleared when browser closes
 - ✅ **Isolation** - Not accessible to web pages or other extensions
 - ✅ **Browser Security** - Protected by browser's security sandbox
+
+**Fallback Mode (if chrome.storage.session unavailable):**
+- Uses encryption with memory-only key (generated per session)
+- Encryption key stored in JavaScript memory, lost on extension reload
+- Encrypted data unrecoverable without the key
+- Still cleared on browser close
 
 **What's stored in session:**
 - Session ID (UUID from Nexus blockchain)
@@ -212,6 +220,7 @@ The wallet uses Chrome's **session storage API** for sensitive data like session
 - User logs out (explicit action)
 - Browser window closes (automatic)
 - Extension is reloaded/updated
+- Fallback mode: Key lost = data unrecoverable
 
 #### Blockchain Session Management
 - 🔐 **Active Session Termination** - Wallet attempts to terminate sessions on the Nexus blockchain when you logout or close the browser
@@ -228,15 +237,24 @@ The wallet uses Chrome's **session storage API** for sensitive data like session
 
 ### Alternative Storage Methods
 
-**Why not use chrome.storage.local?**
-- Writes data to disk (security risk)
-- Persists across browser restarts
-- Could be accessed if computer is stolen
+**Why chrome.storage.session?**
+- ✅ Stored in RAM only, not written to disk
+- ✅ Automatically cleared on browser close
+- ✅ Native browser security sandbox
+- ✅ No need to manage encryption keys
 
-**Why not encrypt and store?**
-- Encryption key would need to be stored somewhere
-- Adds complexity without meaningful security benefit
-- Session-based approach is simpler and more secure
+**Why the encrypted fallback?**
+- Some browsers may not support chrome.storage.session fully
+- Encryption key lives in memory only (lost on reload)
+- Better than plaintext on disk
+- Data becomes unrecoverable when key is lost
+
+**Why not always encrypt in local storage?**
+- Encryption key must be stored somewhere
+- If key on disk → not secure
+- If key in code → visible to anyone
+- If key from password → defeats the purpose
+- Session storage is simpler and more secure
 
 **Hardware wallet integration?**
 - Not currently supported (browser extension limitation)

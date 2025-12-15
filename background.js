@@ -1070,46 +1070,10 @@ async function requestTransactionApproval(transactionData) {
   });
 }
 
-// Handle connection response from approval popup
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.type === 'CONNECTION_RESPONSE') {
-    const { requestId, approved, blocked, origin } = request;
-    console.log('Connection response received:', { requestId, approved, blocked, origin });
-    
-    const pending = pendingApprovals.get(requestId);
-    if (pending) {
-      // Handle blocking if requested
-      if (blocked) {
-        const storage = new StorageService();
-        storage.addBlockedDomain(origin).then(() => {
-          console.log('Domain blocked:', origin);
-        });
-      }
-      
-      // Resolve the promise
-      pending.resolve(approved);
-      pendingApprovals.delete(requestId);
-      
-      // Close the window
-      if (pending.windowId) {
-        chrome.windows.remove(pending.windowId).catch(() => {});
-      }
-    }
-    
-    sendResponse({ success: true });
-    return true;
-  }
-  
-  // Handle other messages
-  handleMessage(request, sender)
-    .then(sendResponse)
-    .catch(error => {
-      console.error('Message handler error:', error);
-      sendResponse({ error: error.message });
-    });
-  
-  return true;
-});
+// ============================================================================
+// NOTE: Message listener is defined at the top of this file (line ~28)
+// This duplicate has been removed to prevent double-execution of messages
+// ============================================================================
 
 // Handle transaction signing
 async function handleSignTransaction(params) {

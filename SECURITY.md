@@ -17,25 +17,41 @@ The wallet uses Chrome's session storage API for all sensitive data. This is the
 
 #### What is chrome.storage.session?
 
-- **Memory-only storage**: Data is kept in RAM, never written to disk
+- **Memory-only storage**: Data is kept in RAM, **NEVER written to disk**
 - **Browser lifecycle**: Data persists only while browser is running
 - **Automatic cleanup**: Cleared when browser closes
 - **Isolated**: Not accessible from web pages or other extensions
 - **Secure context**: Protected by browser's security sandbox
 
+#### Encrypted Fallback Mode
+
+If a browser doesn't fully support chrome.storage.session:
+
+- **Memory-only encryption key**: Generated randomly per session, stored in JavaScript memory
+- **Key lifetime**: Lost when extension reloads/closes
+- **Encrypted on disk**: Data encrypted before storage, but key never persisted
+- **Unrecoverable**: Without the memory-only key, encrypted data is useless
+- **Still cleared on close**: Manual cleanup removes encrypted data
+
+**Why this is secure:**
+- Encryption key never written to disk (lives in memory only)
+- Key lost = data unrecoverable
+- Better than plaintext storage
+- Automatically upgrades when chrome.storage.session available
+
 #### What We Store
 
-**Sensitive Data (chrome.storage.session):**
+**Sensitive Data (chrome.storage.session or encrypted):**
 ```javascript
 {
   session: "UUID-session-id-from-nexus",  // Session token
-  pin: "1234",                              // User's PIN
+  pin: "1234",                              // User's PIN  
   genesis: "hash-value",                    // Account identifier
   username: "myusername"                    // Non-sensitive
 }
 ```
 
-**Persistent Data (chrome.storage.local):**
+**Persistent Data (chrome.storage.local - unencrypted):**
 ```javascript
 {
   nodeUrl: "https://api.distordia.com",   // API endpoint
@@ -47,16 +63,18 @@ The wallet uses Chrome's session storage API for all sensitive data. This is the
 ### Why This Approach?
 
 **✅ Advantages:**
-1. **No disk exposure** - Can't be accessed if computer is stolen (while browser closed)
-2. **Automatic cleanup** - No lingering sensitive data
+1. **No disk exposure** - Data in RAM only (or encrypted with memory-only key)
+2. **Automatic cleanup** - Cleared on browser close
 3. **Industry standard** - Same approach as MetaMask, other major wallets
-4. **Simple & secure** - No complex encryption key management
+4. **No key management** - Encryption key (if needed) lives in memory only
 5. **Browser-protected** - Leverages Chrome's security model
+6. **Graceful degradation** - Fallback for browsers without session storage
 
 **⚠️ Trade-offs:**
 1. **Memory accessible while running** - Vulnerable to memory dumps (inherent to browser wallets)
 2. **Public computers** - Must explicitly logout, don't rely on browser close alone
 3. **No persistence** - Must re-authenticate each browser session
+4. **Fallback complexity** - Encryption adds code complexity (but improves security)
 
 ## Session Management
 
@@ -150,14 +168,15 @@ await storage.clearSession();  // Removes session + PIN
 
 | Threat | Protection |
 |--------|-----------|
-| **Stolen computer (powered off)** | ✅ No sensitive data on disk |
-| **Stolen computer (after browser close)** | ✅ All session data cleared from RAM |
+| **Stolen computer (powered off)** | ✅ No sensitive data on disk (RAM-only or encrypted with memory key) |
+| **Stolen computer (after browser close)** | ✅ All session data cleared from RAM, encryption key lost |
 | **Public computer with offline node** | ✅ Local data cleared regardless of network status |
 | **Malicious extension** | ✅ Isolated storage, chrome.storage.session not accessible |
 | **Malicious website** | ✅ Content script isolation, no direct access to wallet |
 | **Network MITM** | ✅ HTTPS enforcement for remote nodes |
 | **Unauthorized transactions** | ✅ PIN required for all transactions |
 | **Session hijacking** | ✅ Sessions terminated on logout/close (local data always cleared) |
+| **Disk forensics (fallback mode)** | ✅ Data encrypted, key in memory only (unrecoverable) |
 
 ### Threats We Don't Protect Against
 
@@ -171,9 +190,30 @@ await storage.clearSession();  // Removes session + PIN
 
 ## Alternative Approaches
 
-### Why Not Encrypt and Store Persistently?
+### Our Encrypted Fallback Approach
 
-**Option:** Store encrypted PIN/session on disk
+**Implementation:**
+```javascript
+// Generate memory-only encryption key (lost on reload)
+this.encryptionKey = generateRandomKey(); // Lives in JavaScript memory
+
+// Encrypt before storing
+const encrypted = encrypt(sensitiveData, this.encryptionKey);
+chrome.storage.local.set({ encrypted }); // Encrypted data on disk
+
+// On extension reload: Key lost = data unrecoverable
+```
+
+**Why this works:**
+- ✅ Encryption key NEVER written to disk
+- ✅ Key lives in JavaScript memory only
+- ✅ Extension reload/close = key lost forever
+- ✅ Encrypted data on disk is useless without key
+- ✅ Better than plaintext fallback
+
+### Why Not Persistent Encryption?
+
+**Option:** Store encrypted PIN/session on disk with persistent key
 
 **Why we don't:**
 ```javascript
@@ -182,12 +222,13 @@ const encryptedPIN = encrypt(PIN, encryptionKey);
 chrome.storage.local.set({ encryptedPIN }); // On disk
 
 // Problem: Where does encryptionKey come from?
-// 1. Hardcoded in extension? → No security (source is public)
-// 2. Derived from password? → Must store password (circular problem)
-// 3. User enters each time? → Same as just entering PIN
+// 1. Hardcoded in extension? → No security (source is public/auditable)
+// 2. Stored on disk? → Defeats encryption purpose
+// 3. Derived from password? → Must store password (circular problem)
+// 4. User enters each time? → Same as just entering PIN
 ```
 
-**Conclusion:** Encryption doesn't add security, only complexity
+**Conclusion:** Persistent encryption doesn't add real security
 
 ### Why Not Hardware Wallet?
 

@@ -175,70 +175,6 @@
       </div>
     </div>
 
-    <!-- Batch Transaction Section -->
-    <div class="section">
-      <h3>5. Batch Transactions (Multiple Orders)</h3>
-      <p style="color: #666; font-size: 14px;">Execute multiple transactions with a single PIN approval. Perfect for market orders, bulk payments, etc.</p>
-      
-      <div style="margin: 15px 0;">
-        <div class="label">Transaction 1:</div>
-        <input type="text" id="batch-to-1" placeholder="Recipient 1 address">
-        <input type="number" id="batch-amount-1" placeholder="Amount 1" step="0.01" min="0" value="1.5">
-        <input type="text" id="batch-ref-1" placeholder="Reference 1 (optional)" value="Order #1">
-      </div>
-      
-      <div style="margin: 15px 0;">
-        <div class="label">Transaction 2:</div>
-        <input type="text" id="batch-to-2" placeholder="Recipient 2 address">
-        <input type="number" id="batch-amount-2" placeholder="Amount 2" step="0.01" min="0" value="2.5">
-        <input type="text" id="batch-ref-2" placeholder="Reference 2 (optional)" value="Order #2">
-      </div>
-      
-      <div style="margin: 15px 0;">
-        <div class="label">Transaction 3:</div>
-        <input type="text" id="batch-to-3" placeholder="Recipient 3 address">
-        <input type="number" id="batch-amount-3" placeholder="Amount 3" step="0.01" min="0" value="0.75">
-        <input type="text" id="batch-ref-3" placeholder="Reference 3 (optional)" value="Order #3">
-      </div>
-      
-      <button id="batch-send-btn" onclick="sendBatchTransactions()" disabled style="background: #ff6600;">Send Batch (3 Transactions)</button>
-      
-      <div id="batch-result" style="display: none;">
-        <div class="label">Batch Result:</div>
-        <div class="info-item" id="batch-data"></div>
-      </div>
-    </div>
-
-    <!-- Section 6: Batch API Calls -->
-    <div class="section">
-      <h2>6. Batch API Calls (Multiple Operations)</h2>
-      <p>Execute multiple different API operations with a single approval. Supports up to 12 API calls per batch.</p>
-      
-      <div class="form-group">
-        <div class="label">Example: Market Orders + Finance Debit</div>
-        <p style="font-size: 14px; color: #666; margin-bottom: 12px;">
-          This example will execute 4 API calls:
-          <br>• market/execute/order (Order 1)
-          <br>• market/execute/order (Order 2)
-          <br>• market/create/bid
-          <br>• finance/debit/account (Fee payment)
-        </p>
-      </div>
-      
-      <button id="batch-calls-btn" onclick="executeBatchCalls()" disabled style="background: #9c27b0;">Execute Batch API Calls</button>
-      
-      <div id="batch-calls-result" style="display: none;">
-        <div class="label">Batch Calls Result:</div>
-        <div class="info-item" id="batch-calls-data"></div>
-      </div>
-
-      <div style="background: #e3f2fd; padding: 12px; border-radius: 6px; margin-top: 16px; font-size: 13px;">
-        <strong>ℹ️ Fees:</strong>
-        <br>• DIST Service: 1 NXS (1-4 calls), 2 NXS (5-8 calls), 3 NXS (9-12 calls)
-        <br>• Nexus Network: 0.01 NXS per call (within 10 seconds of first call)
-      </div>
-    </div>
-
     <!-- Code Example -->
     <div class="section">
       <h3>Developer Reference</h3>
@@ -253,30 +189,13 @@ if (typeof window.nexus !== 'undefined') {
   const balance = await window.nexus.getBalance();
   console.log('Balance:', balance);
   
-  // Send single transaction
+  // Send transaction
   const tx = await window.nexus.sendTransaction({
-    to: 'recipient-address',
+    to: ent-address',
     amount: 10.5,
     reference: 'Payment'
   });
   console.log('Transaction:', tx);
-  
-  // Send batch transactions (NEW!)
-  const batchResult = await window.nexus.sendBatchTransactions([
-    { to: 'address1', amount: 5.0, reference: 1 },
-    { to: 'address2', amount: 3.5, reference: 2 },
-    { to: 'address3', amount: 1.5, reference: 3 }
-  ]);
-  console.log('Batch result:', batchResult);
-  
-  // Execute batch API calls (NEW!)
-  const batchCallsResult = await window.nexus.executeBatchCalls([
-    { endpoint: 'market/execute/order', params: { txid: '0123...abcdef', from: 'default', to: 'default' } },
-    { endpoint: 'market/execute/order', params: { txid: 'fedc...987654', from: 'default', to: 'default' } },
-    { endpoint: 'market/create/bid', params: { market: 'NXS/USD', amount: 10, price: 1.5, from: 'default', to: 'usd' } },
-    { endpoint: 'finance/debit/account', params: { from: 'default', to: 'fee-address', amount: 0.1 } }
-  ]);
-  console.log('Batch calls result:', batchCallsResult);
 }</code></pre>
     </div>
   </div>
@@ -287,7 +206,7 @@ if (typeof window.nexus !== 'undefined') {
     // Check if Nexus Wallet is installed
     async function checkWalletInstalled() {
       if (typeof window.nexus === 'undefined') {
-        updateStatus('Nexus Wallet not detected! Please install the extension.', 'error');
+        updateStatus('Nexus Wallet not detected! Please ithe extension.', 'error');
         return false;
       }
       updateStatus('Nexus Wallet detected!', 'connected');
@@ -300,8 +219,7 @@ if (typeof window.nexus !== 'undefined') {
         if (!await checkWalletInstalled()) return;
 
         updateStatus('Connecting to wallet...', '');
-        const accounts = await window.nexus.connect();
-        
+        const accounts = await window.nexus.connect()   
         if (accounts && accounts.length > 0) {
           connectedAccount = accounts[0];
           updateStatus('Connected to wallet!', 'connected');
@@ -316,7 +234,6 @@ if (typeof window.nexus !== 'undefined') {
           document.getElementById('balance-btn').disabled = false;
           document.getElementById('send-btn').disabled = false;
           document.getElementById('history-btn').disabled = false;
-          document.getElementById('batch-send-btn').disabled = false;
         } else {
           updateStatus('No accounts found. Please log in to your wallet.', 'error');
         }
@@ -327,49 +244,33 @@ if (typeof window.nexus !== 'undefined') {
     }
 
     // Disconnect wallet
-    // Disconnect from wallet
     async function disconnectWallet() {
       try {
-        if (!await checkWalletInstalled()) return;
-
-        updateStatus('Disconnecting...', '');
-        
-        // Call wallet disconnect method
+        // Call the wallet API to disconnect
         await window.nexus.disconnect();
         
         connectedAccount = null;
         
         // Update UI
-        updateStatus('Wallet disconnected successfully!', '');
-        
-        // Hide all info sections (with null checks)
-        const elementsToHide = [
-          'account-info', 'balance-info', 'tx-result', 
-          'history-info', 'batch-result', 'batch-calls-result'
-        ];
-        elementsToHide.forEach(id => {
-          const element = document.getElementById(id);
-          if (element) element.style.display = 'none';
-        });
+        updateStatus('Wallet disconnected successfully', '');
+        document.getElementById('account-info').style.display = 'none';
+        document.getElementById('balance-info').style.display = 'none';
+        document.getElementById('tx-info').style.display = 'none';
+        document.getElementById('history-info').style.display = 'none';
         
         // Show connect button, hide disconnect button
         document.getElementById('connect-btn').style.display = 'inline-block';
         document.getElementById('disconnect-btn').style.display = 'none';
         
         // Disable buttons
-        const buttonsToDisable = [
-          'balance-btn', 'send-btn', 'history-btn', 
-          'batch-send-btn', 'batch-calls-btn'
-        ];
-        buttonsToDisable.forEach(id => {
-          const button = document.getElementById(id);
-          if (button) button.disabled = true;
-        });
+        document.getElementById('balance-btn').disabled = true;
+        document.getElementById('send-btn').disabled = true;
+        document.getElementById('history-btn').disabled = true;
         
-        alert('Successfully disconnected from Q-Wallet!');
+        alert('Successfully disconnected from wallet!');
       } catch (error) {
         console.error('Disconnect failed:', error);
-        updateStatus('Disconnect failed: ' + error.message, 'error');
+        updateStatus('Failed to disconnect: ' + error.message, 'error');
       }
     }
 
@@ -394,8 +295,6 @@ if (typeof window.nexus !== 'undefined') {
           document.getElementById('balance-btn').disabled = false;
           document.getElementById('send-btn').disabled = false;
           document.getElementById('history-btn').disabled = false;
-          document.getElementById('batch-send-btn').disabled = false;
-          document.getElementById('batch-calls-btn').disabled = false;
         } else {
           updateStatus('Wallet not connected. Click "Connect Wallet" button.', '');
           
@@ -437,17 +336,11 @@ if (typeof window.nexus !== 'undefined') {
 
         updateStatus('Sending transaction...', '');
         
-        // Build transaction object, omitting reference if empty
-        const txParams = {
+        const result = await window.nexus.sendTransaction({
           to: to,
-          amount: amount
-        };
-        
-        if (reference) {
-          txParams.reference = reference;
-        }
-        
-        const result = await window.nexus.sendTransaction(txParams);
+          amount: amount,
+          reference: reference
+        });
 
         document.getElementById('tx-data').textContent = JSON.stringify(result, null, 2);
         document.getElementById('tx-result').style.display = 'block';
@@ -472,12 +365,22 @@ if (typeof window.nexus !== 'undefined') {
         if (!transactions || transactions.length === 0) {
           historyList.innerHTML = '<div class="info-item">No transactions found</div>';
         } else {
-          historyList.innerHTML = transactions.map(tx => 
-            `<div class="info-item">
-              ${tx.type || 'Transaction'} - ${tx.amount || 0} NXS
-              <br><small>${new Date(tx.timestamp * 1000).toLocaleString()}</small>
-            </div>`
-          ).join('');
+          historyList.textContent = '';
+          transactions.forEach((tx) => {
+            const item = document.createElement('div');
+            item.className = 'info-item';
+            
+            const typeText = tx.type || 'Transaction';
+            const amountText = `${tx.amount || 0} NXS`;
+            item.appendChild(document.createTextNode(`${typeText} - ${amountText}`));
+            
+            item.appendChild(document.createElement('br'));
+            const small = document.createElement('small');
+            small.textContent = new Date(tx.timestamp * 1000).toLocaleString();
+            item.appendChild(small);
+            
+            historyList.appendChild(item);
+          });
         }
         
         document.getElementById('history-info').style.display = 'block';
@@ -485,112 +388,6 @@ if (typeof window.nexus !== 'undefined') {
       } catch (error) {
         console.error('Get history failed:', error);
         updateStatus('Failed to get history: ' + error.message, 'error');
-      }
-    }
-
-    // Send batch transactions
-    async function sendBatchTransactions() {
-      try {
-        // Collect all transactions
-        const transactions = [];
-        
-        for (let i = 1; i <= 3; i++) {
-          const to = document.getElementById(`batch-to-${i}`).value.trim();
-          const amount = parseFloat(document.getElementById(`batch-amount-${i}`).value);
-          const reference = document.getElementById(`batch-ref-${i}`).value.trim();
-          
-          if (to && amount && amount > 0) {
-            // Build transaction object, omitting reference if empty
-            const tx = {
-              to: to,
-              amount: amount
-            };
-            
-            if (reference) {
-              tx.reference = reference;
-            }
-            
-            transactions.push(tx);
-          }
-        }
-        
-        if (transactions.length === 0) {
-          alert('Please enter at least one transaction with recipient and amount');
-          return;
-        }
-        
-        updateStatus(`Sending batch of ${transactions.length} transactions...`, '');
-        
-        const result = await window.nexus.sendBatchTransactions(transactions);
-        
-        document.getElementById('batch-data').textContent = JSON.stringify(result, null, 2);
-        document.getElementById('batch-result').style.display = 'block';
-        updateStatus(`Batch transaction successful! ${result.successfulTransactions}/${result.totalTransactions} completed.`, 'connected');
-        
-        // Clear form
-        for (let i = 1; i <= 3; i++) {
-          document.getElementById(`batch-to-${i}`).value = '';
-          document.getElementById(`batch-amount-${i}`).value = '';
-          document.getElementById(`batch-ref-${i}`).value = '';
-        }
-      } catch (error) {
-        console.error('Batch transaction failed:', error);
-        updateStatus('Batch transaction failed: ' + error.message, 'error');
-      }
-    }
-
-    // Execute batch API calls
-    async function executeBatchCalls() {
-      try {
-        updateStatus('Executing batch API calls...', '');
-        
-        // Example batch: market orders + finance debit
-        const calls = [
-          {
-            endpoint: 'market/execute/order',
-            params: {
-              txid: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
-              from: 'default',
-              to: 'account2'
-              // Note: This is just an example - you'd need a real order txid
-            }
-          },
-          {
-            endpoint: 'market/execute/order',
-            params: {
-              txid: 'fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210',
-              from: 'default',
-              to: 'account2'
-            }
-          },
-          {
-            endpoint: 'market/create/bid',
-            params: {
-              market: 'NXS/USD',
-              amount: 10.0,
-              price: 1.50,
-              from: 'default',
-              to: 'account2'
-            }
-          },
-          {
-            endpoint: 'finance/debit/account',
-            params: {
-              from: 'default',
-              to: '8Csmb3RP227N1NHJDH8QZRjZjobe4udaygp7aNv5VLPWDvLDVD7',
-              amount: 0.5
-            }
-          }
-        ];
-        
-        const result = await window.nexus.executeBatchCalls(calls);
-        
-        document.getElementById('batch-calls-data').textContent = JSON.stringify(result, null, 2);
-        document.getElementById('batch-calls-result').style.display = 'block';
-        updateStatus(`Batch calls successful! ${result.successfulCalls}/${result.totalCalls} completed. DIST fee: ${result.distFee} NXS`, 'connected');
-      } catch (error) {
-        console.error('Batch calls failed:', error);
-        updateStatus('Batch calls failed: ' + error.message, 'error');
       }
     }
 

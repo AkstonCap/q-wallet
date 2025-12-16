@@ -36,6 +36,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       showLockedState();
     } else {
       console.log('Session is unlocked - enabling all features');
+      hideLockedState(); // Ensure locked state is hidden
       startAutoRefresh();
     }
   } else {
@@ -262,6 +263,7 @@ async function handleLogin() {
       showLockedState();
     } else {
       console.log('Session is unlocked - starting auto-refresh');
+      hideLockedState(); // Ensure locked state is hidden
       startAutoRefresh();
     }
     
@@ -742,18 +744,32 @@ function createTransactionItem(tx) {
   // Special handling for CREATE operations (no amount display)
   const showAmount = amount > 0;
   
-  div.innerHTML = `
-    <div class="transaction-icon ${isIncoming ? 'receive' : 'send'}">
-      ${isIncoming ? '↓' : '↑'}
-    </div>
-    <div class="transaction-details">
-      <div class="transaction-type">${txType}</div>
-      <div class="transaction-date">${formatDate(tx.timestamp || Date.now())}</div>
-    </div>
-    <div class="transaction-amount ${isIncoming ? 'positive' : 'negative'}">
-      ${showAmount ? (isIncoming ? '+' : '-') + formatAmount(amount) + ' ' + ticker : '—'}
-    </div>
-  `;
+  // Build transaction item safely using DOM nodes
+  const icon = document.createElement('div');
+  icon.className = `transaction-icon ${isIncoming ? 'receive' : 'send'}`;
+  icon.textContent = isIncoming ? '↓' : '↑';
+  
+  const details = document.createElement('div');
+  details.className = 'transaction-details';
+  
+  const type = document.createElement('div');
+  type.className = 'transaction-type';
+  type.textContent = txType;
+  
+  const date = document.createElement('div');
+  date.className = 'transaction-date';
+  date.textContent = formatDate(tx.timestamp || Date.now());
+  
+  details.appendChild(type);
+  details.appendChild(date);
+  
+  const amountDiv = document.createElement('div');
+  amountDiv.className = `transaction-amount ${isIncoming ? 'positive' : 'negative'}`;
+  amountDiv.textContent = showAmount ? (isIncoming ? '+' : '-') + formatAmount(amount) + ' ' + ticker : '—';
+  
+  div.appendChild(icon);
+  div.appendChild(details);
+  div.appendChild(amountDiv);
   
   return div;
 }
@@ -1302,21 +1318,43 @@ async function loadConnectedSites() {
     
     console.log('Creating site item for:', domain, 'Display:', displayDomain);
     
-    item.innerHTML = `
-      <div class="connected-site-info">
-        <div class="connected-site-icon">🌐</div>
-        <div class="connected-site-details">
-          <div class="connected-site-domain">${displayDomain}</div>
-          <div class="connected-site-url">${domain}</div>
-        </div>
-      </div>
-      <button class="revoke-icon-btn" data-domain="${domain}" title="Revoke access">🗑️</button>
-    `;
+    // Build site item safely using DOM nodes
+    const siteInfo = document.createElement('div');
+    siteInfo.className = 'connected-site-info';
+    
+    const icon = document.createElement('div');
+    icon.className = 'connected-site-icon';
+    icon.textContent = '🌐';
+    
+    const siteDetails = document.createElement('div');
+    siteDetails.className = 'connected-site-details';
+    
+    const domainDiv = document.createElement('div');
+    domainDiv.className = 'connected-site-domain';
+    domainDiv.textContent = displayDomain;
+    
+    const urlDiv = document.createElement('div');
+    urlDiv.className = 'connected-site-url';
+    urlDiv.textContent = domain;
+    
+    siteDetails.appendChild(domainDiv);
+    siteDetails.appendChild(urlDiv);
+    siteInfo.appendChild(icon);
+    siteInfo.appendChild(siteDetails);
+    
+    const revokeBtn = document.createElement('button');
+    revokeBtn.className = 'revoke-icon-btn';
+    revokeBtn.dataset.domain = domain;
+    revokeBtn.title = 'Revoke access';
+    revokeBtn.textContent = '🗑️';
+    
+    item.appendChild(siteInfo);
+    item.appendChild(revokeBtn);
     
     console.log('Item HTML:', item.innerHTML);
     
     // Add revoke button handler
-    item.querySelector('.revoke-icon-btn').addEventListener('click', (e) => {
+    revokeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       handleRevokeConnection(domain);
     });
@@ -1502,27 +1540,46 @@ function hideLoading() {
 function showUnlockPrompt() {
   const overlay = document.getElementById('loading-overlay');
   overlay.classList.remove('hidden');
-  overlay.innerHTML = `
-    <div style="background: white; padding: 30px; border-radius: 12px; max-width: 300px; text-align: center;">
-      <h3 style="margin: 0 0 15px 0; color: #333;">Wallet Locked</h3>
-      <p style="color: #666; margin-bottom: 20px;">Enter your PIN to unlock</p>
-      <input type="password" id="unlock-pin-input" placeholder="Enter PIN" maxlength="8" 
-        style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; margin-bottom: 15px;" 
-        autocomplete="off">
-      <button id="unlock-btn" class="btn btn-primary" style="width: 100%; padding: 12px; background: #ff6600; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600;">
-        Unlock
-      </button>
-    </div>
-  `;
+  overlay.textContent = '';
+  
+  // Build unlock prompt safely using DOM nodes
+  const container = document.createElement('div');
+  container.style.cssText = 'background: white; padding: 30px; border-radius: 12px; max-width: 300px; text-align: center;';
+  
+  const title = document.createElement('h3');
+  title.style.cssText = 'margin: 0 0 15px 0; color: #333;';
+  title.textContent = 'Wallet Locked';
+  
+  const message = document.createElement('p');
+  message.style.cssText = 'color: #666; margin-bottom: 20px;';
+  message.textContent = 'Enter your PIN to unlock';
+  
+  const pinInput = document.createElement('input');
+  pinInput.type = 'password';
+  pinInput.id = 'unlock-pin-input';
+  pinInput.placeholder = 'Enter PIN';
+  pinInput.maxLength = 8;
+  pinInput.autocomplete = 'off';
+  pinInput.style.cssText = 'width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; margin-bottom: 15px;';
+  
+  const unlockBtn = document.createElement('button');
+  unlockBtn.id = 'unlock-btn';
+  unlockBtn.className = 'btn btn-primary';
+  unlockBtn.style.cssText = 'width: 100%; padding: 12px; background: #ff6600; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600;';
+  unlockBtn.textContent = 'Unlock';
+  
+  container.appendChild(title);
+  container.appendChild(message);
+  container.appendChild(pinInput);
+  container.appendChild(unlockBtn);
+  overlay.appendChild(container);
   
   // Focus PIN input
   setTimeout(() => {
-    const pinInput = document.getElementById('unlock-pin-input');
     if (pinInput) {
       pinInput.focus();
       
       // Handle unlock
-      const unlockBtn = document.getElementById('unlock-btn');
       const handleUnlock = async () => {
         const pin = pinInput.value;
         if (!pin) {
@@ -1531,7 +1588,14 @@ function showUnlockPrompt() {
         }
         
         try {
-          overlay.innerHTML = '<div class="spinner"></div><div class="loading-text">Unlocking...</div>';
+          overlay.textContent = '';
+          const spinner = document.createElement('div');
+          spinner.className = 'spinner';
+          const loadingText = document.createElement('div');
+          loadingText.className = 'loading-text';
+          loadingText.textContent = 'Unlocking...';
+          overlay.appendChild(spinner);
+          overlay.appendChild(loadingText);
           await wallet.unlock(pin);
           hideLoading();
           hideLockedState();

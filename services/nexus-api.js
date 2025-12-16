@@ -96,8 +96,8 @@ class NexusAPI {
   }
 
   // Terminate session (logout)
-  async terminateSession(session) {
-    return this.request('sessions/terminate/local', { session });
+  async terminateSession(session, pin) {
+    return this.request('sessions/terminate/local', { session, pin });
   }
 
   // Unlock session with PIN

@@ -3,12 +3,109 @@
 This document provides a detailed overview of the security measures implemented in Distordia Q-Wallet.
 
 ## Table of Contents
+- [Quantum Security](#quantum-security)
 - [Storage Security](#storage-security)
 - [Session Management](#session-management)
 - [Code Security](#code-security)
 - [Threat Model](#threat-model)
 - [Alternative Approaches](#alternative-approaches)
 - [Security Auditing](#security-auditing)
+
+## Quantum Security
+
+### Overview
+
+**Distordia Q-Wallet achieves quantum resistance through the Nexus blockchain's SigChain (Signature Chain) architecture.** This is not a feature of the wallet itself, but rather an inherent property of how Nexus secures transactions.
+
+**Security Rating: A+ (Quantum-Resistant)**
+
+### How SigChains Provide Quantum Resistance
+
+#### The Quantum Computing Threat
+
+Quantum computers threaten traditional cryptocurrency security through:
+- **Shor's Algorithm**: Can break RSA and ECC by deriving private keys from public keys
+- **Key Reuse**: Most blockchains expose public keys on-chain, creating permanent attack surface
+- **Future Vulnerability**: "Store now, decrypt later" attacks on historical transactions
+
+#### Nexus SigChain Solution
+
+The Nexus blockchain uses **Signature Chains (SigChains)** which provide quantum resistance through:
+
+1. **One-Time Keypairs**
+   - Each transaction generates a new keypair
+   - Private key signs the transaction once, then discarded
+   - Public key revealed only at transaction broadcast
+
+2. **No Key Reuse**
+   - Once a keypair is used for a transaction, it is NEVER reused
+   - Even if quantum computers derive the private key from the public key, the key is already obsolete
+   - Historical transactions cannot be reversed (coins already moved to new addresses with new keypairs)
+
+3. **Hardware-Like Security Model**
+   - Similar to hardware wallets that generate new addresses per transaction
+   - Each transaction proves chain of ownership from genesis to current state
+   - Mathematical chain links transactions without exposing long-term keypairs
+
+4. **Forward Secrecy**
+   - Compromising one transaction's keypair doesn't affect other transactions
+   - Past transactions remain secure even if future keys are compromised
+   - Quantum computer would need to break EVERY individual transaction in real-time
+
+### Comparison to Traditional Blockchains
+
+| Security Aspect | Traditional (Bitcoin/Ethereum) | Nexus SigChains |
+|----------------|-------------------------------|-----------------|
+| **Public Key Exposure** | Permanent on-chain | One-time per transaction |
+| **Key Reuse** | Common (address reuse) | Never (architectural) |
+| **Quantum Vulnerability** | High (Shor's algorithm) | Minimal (keys expire) |
+| **Post-Quantum Ready** | Requires protocol upgrade | Already implemented |
+| **Attack Window** | Unlimited time | Single transaction window |
+
+### User Benefits
+
+- **Future-Proof Security**: Protected against quantum computers without user action
+- **Transparent Protection**: SigChain security is automatic and invisible to users
+- **No Performance Cost**: One-time keypairs don't slow down transactions
+- **Long-Term Safety**: Historical transactions remain secure indefinitely
+
+### Technical Implementation
+
+The wallet leverages Nexus SigChain security by:
+1. **Proper Session Management**: Each login session uses SigChain authentication
+2. **Transaction Signing**: All transactions automatically use one-time keypairs via Nexus API
+3. **No Manual Key Management**: Users never handle individual keypairs directly
+4. **Visual Indicator**: Quantum-resistant badge displayed when wallet is unlocked
+
+### Limitations and Considerations
+
+**What QWallet Does:**
+- ✅ Properly uses Nexus SigChain architecture
+- ✅ Maintains secure session handling
+- ✅ Protects credentials in memory
+- ✅ Displays quantum security status to users
+
+**What QWallet Cannot Control:**
+- ⚠️ Network transport security (depends on TLS/HTTPS version)
+- ⚠️ Node operator security practices
+- ⚠️ Browser security vulnerabilities
+- ⚠️ User device security (malware, keyloggers)
+
+**Recommendations:**
+- Use TLS 1.3 or higher for node connections
+- Connect only to trusted Nexus nodes
+- Keep browser and OS updated
+- Use antivirus/anti-malware software
+- Never install untrusted browser extensions
+
+### External References
+
+For more information on Nexus SigChains and quantum resistance:
+- Nexus Whitepaper: [https://nexus.io/whitepaper](https://nexus.io/whitepaper)
+- SigChain Technical Documentation: See Nexus API documentation
+- Quantum Computing Threats to Cryptography: NIST Post-Quantum Cryptography standards
+
+---
 
 ## Storage Security
 

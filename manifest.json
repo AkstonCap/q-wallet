@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Distordia Q-wallet",
-  "version": "0.1.5.2",
+  "version": "0.1.5.3",
   "description": "Secure cryptocurrency browser plugin for the Nexus blockchain",
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"

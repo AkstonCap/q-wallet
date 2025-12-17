@@ -406,6 +406,13 @@ class StorageService {
     return blocked.includes(domain);
   }
 
+  // Remove blocked domain
+  async removeBlockedDomain(domain) {
+    const blocked = await this.getBlockedDomains();
+    const filtered = blocked.filter(d => d !== domain);
+    await this.set('blockedDomains', filtered);
+  }
+
   // ===== DApp Activity Tracking =====
 
   // Update last activity timestamp for a domain

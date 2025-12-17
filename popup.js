@@ -1326,6 +1326,7 @@ async function loadSettings() {
   
   // Load connected sites
   await loadConnectedSites();
+  await loadBlockedSites();
 }
 
 // Load connected sites list
@@ -1418,6 +1419,90 @@ async function handleRevokeConnection(domain) {
   } catch (error) {
     console.error('Failed to revoke connection:', error);
     showNotification('Failed to revoke connection', 'error');
+  }
+}
+
+// Load blocked sites list
+async function loadBlockedSites() {
+  const storage = new StorageService();
+  const blockedDomains = await storage.getBlockedDomains();
+  const container = document.getElementById('blocked-sites-list');
+  
+  if (!blockedDomains || blockedDomains.length === 0) {
+    container.textContent = '';
+    const emptyDiv = document.createElement('div');
+    emptyDiv.className = 'empty-state';
+    emptyDiv.textContent = 'No sites blocked';
+    container.appendChild(emptyDiv);
+    return;
+  }
+  
+  container.textContent = '';
+  
+  blockedDomains.forEach(domain => {
+    const item = document.createElement('div');
+    item.className = 'connected-site-item blocked-site-item';
+    
+    // Format the domain to show just the hostname
+    const displayDomain = domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    
+    // Build site item safely using DOM nodes
+    const siteInfo = document.createElement('div');
+    siteInfo.className = 'connected-site-info';
+    
+    const icon = document.createElement('div');
+    icon.className = 'connected-site-icon';
+    icon.textContent = '🚫';
+    
+    const siteDetails = document.createElement('div');
+    siteDetails.className = 'connected-site-details';
+    
+    const domainDiv = document.createElement('div');
+    domainDiv.className = 'connected-site-domain';
+    domainDiv.textContent = displayDomain;
+    
+    const urlDiv = document.createElement('div');
+    urlDiv.className = 'connected-site-url';
+    urlDiv.textContent = domain;
+    
+    siteDetails.appendChild(domainDiv);
+    siteDetails.appendChild(urlDiv);
+    siteInfo.appendChild(icon);
+    siteInfo.appendChild(siteDetails);
+    
+    const unblockBtn = document.createElement('button');
+    unblockBtn.className = 'revoke-icon-btn unblock-icon-btn';
+    unblockBtn.dataset.domain = domain;
+    unblockBtn.title = 'Unblock site';
+    unblockBtn.textContent = '✓';
+    
+    item.appendChild(siteInfo);
+    item.appendChild(unblockBtn);
+    
+    // Add unblock button handler
+    unblockBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleUnblockSite(domain);
+    });
+    
+    container.appendChild(item);
+  });
+}
+
+// Handle unblock site
+async function handleUnblockSite(domain) {
+  if (!confirm(`Are you sure you want to unblock ${domain}?`)) {
+    return;
+  }
+  
+  try {
+    const storage = new StorageService();
+    await storage.removeBlockedDomain(domain);
+    showNotification('Site unblocked successfully', 'success');
+    await loadBlockedSites();
+  } catch (error) {
+    console.error('Failed to unblock site:', error);
+    showNotification('Failed to unblock site', 'error');
   }
 }
 

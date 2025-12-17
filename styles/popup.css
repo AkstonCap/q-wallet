@@ -1045,6 +1045,24 @@ body {
   transform: scale(1.0);
 }
 
+.unblock-icon-btn {
+  color: #28a745;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.unblock-icon-btn:hover {
+  color: #218838;
+}
+
+.blocked-site-item {
+  opacity: 0.85;
+}
+
+.blocked-site-item .connected-site-icon {
+  opacity: 0.7;
+}
+
 .revoke-all-icon-btn {
   background: none;
   border: none;

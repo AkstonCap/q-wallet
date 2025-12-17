@@ -58,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Display calls in the list
 function displayCalls() {
   const container = document.getElementById('calls-list');
-  container.innerHTML = '';
+  container.textContent = '';
   
   callsData.forEach((call, index) => {
     const callItem = document.createElement('div');

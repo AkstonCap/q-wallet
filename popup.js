@@ -275,6 +275,17 @@ async function handleLogin() {
     console.error('Login failed:', error);
     showNotification('Login failed: ' + error.message, 'error');
     hideLoading();
+    
+    // SECURITY: Rate limiting - disable login button for 2 seconds after failed attempt
+    const loginBtn = document.getElementById('login-btn');
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Wait 2s...';
+    
+    setTimeout(() => {
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'Login';
+    }, 2000);
+    
     // Clear password and PIN on error too
     document.getElementById('login-password').value = '';
     document.getElementById('login-pin').value = '';
@@ -427,11 +438,15 @@ async function loadTransactions() {
     const container = document.getElementById('transactions-list');
 
     if (!transactions || transactions.length === 0) {
-      container.innerHTML = '<div class="empty-state">No transactions yet</div>';
+      container.textContent = '';
+      const emptyDiv = document.createElement('div');
+      emptyDiv.className = 'empty-state';
+      emptyDiv.textContent = 'No transactions yet';
+      container.appendChild(emptyDiv);
       return;
     }
 
-    container.innerHTML = '';
+    container.textContent = '';
     
     // Only show the last 12 transactions
     const limitedTransactions = transactions.slice(0, 12);
@@ -616,7 +631,11 @@ async function loadTokensList() {
     console.log('Tokens list - balance array:', balanceArray);
     
     if (!balanceArray || (Array.isArray(balanceArray) && balanceArray.length === 0)) {
-      container.innerHTML = '<div class="empty-state">No tokens found</div>';
+      container.textContent = '';
+      const emptyDiv = document.createElement('div');
+      emptyDiv.className = 'empty-state';
+      emptyDiv.textContent = 'No tokens found';
+      container.appendChild(emptyDiv);
       return;
     }
     
@@ -628,11 +647,15 @@ async function loadTokensList() {
     console.log('Tokens list - filtered tokens:', tokens);
     
     if (tokens.length === 0) {
-      container.innerHTML = '<div class="empty-state">No tokens found</div>';
+      container.textContent = '';
+      const emptyDiv = document.createElement('div');
+      emptyDiv.className = 'empty-state';
+      emptyDiv.textContent = 'No tokens found';
+      container.appendChild(emptyDiv);
       return;
     }
 
-    container.innerHTML = '';
+    container.textContent = '';
     
     // Display each token with total balance
     tokens.forEach(token => {
@@ -670,7 +693,11 @@ async function loadTokensList() {
     });
   } catch (error) {
     console.error('Failed to load tokens list:', error);
-    container.innerHTML = '<div class="empty-state">Failed to load tokens</div>';
+    container.textContent = '';
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'empty-state';
+    errorDiv.textContent = 'Failed to load tokens';
+    container.appendChild(errorDiv);
   }
 }
 
@@ -1004,7 +1031,11 @@ async function populateSendAccounts() {
     const select = document.getElementById('send-from-account');
     
     // Clear existing options except the first one
-    select.innerHTML = '<option value="">Select account...</option>';
+    select.textContent = '';
+    const placeholderOption = document.createElement('option');
+    placeholderOption.value = '';
+    placeholderOption.textContent = 'Select account...';
+    select.appendChild(placeholderOption);
     
     // Add each account as an option
     accounts.forEach(account => {
@@ -1099,7 +1130,7 @@ async function showReceiveAddress() {
     
     // Populate account selector
     const select = document.getElementById('receive-account-select');
-    select.innerHTML = '';
+    select.textContent = '';
     
     accounts.forEach(account => {
       const option = document.createElement('option');
@@ -1299,7 +1330,11 @@ async function loadConnectedSites() {
   const revokeAllBtn = document.getElementById('revoke-all-btn');
   
   if (!approvedDomains || approvedDomains.length === 0) {
-    container.innerHTML = '<div class="empty-state">No sites connected</div>';
+    container.textContent = '';
+    const emptyDiv = document.createElement('div');
+    emptyDiv.className = 'empty-state';
+    emptyDiv.textContent = 'No sites connected';
+    container.appendChild(emptyDiv);
     revokeAllBtn.style.display = 'none';
     return;
   }
@@ -1307,7 +1342,7 @@ async function loadConnectedSites() {
   // Show Revoke All button when there are connected sites
   revokeAllBtn.style.display = 'block';
   
-  container.innerHTML = '';
+  container.textContent = '';
   
   approvedDomains.forEach(domain => {
     const item = document.createElement('div');

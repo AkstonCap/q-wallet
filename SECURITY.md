@@ -5,6 +5,7 @@ This document provides a detailed overview of the security measures implemented 
 ## Table of Contents
 - [Storage Security](#storage-security)
 - [Session Management](#session-management)
+- [Code Security](#code-security)
 - [Threat Model](#threat-model)
 - [Alternative Approaches](#alternative-approaches)
 - [Security Auditing](#security-auditing)
@@ -162,6 +163,165 @@ await storage.clearSession();  // Removes session + PIN
 - ⏳ Orphaned blockchain session times out automatically
 - 🏛️ Safe for public computer use
 
+## Code Security
+
+### Content Security Policy (CSP)
+
+The extension enforces a strict Content Security Policy to prevent code injection attacks:
+
+```json
+{
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}
+```
+
+**What this blocks:**
+- ❌ All inline `<script>` tags
+- ❌ All `eval()` and `Function()` constructors
+- ❌ All event handlers in HTML (`onclick=`, `onerror=`, etc.)
+- ❌ External scripts from untrusted sources
+- ✅ Only allows scripts from the extension package itself
+
+**Why this is critical:**
+- Prevents XSS (Cross-Site Scripting) attacks
+- Blocks code injection even if bugs exist
+- Defense-in-depth security layer
+- Industry standard for browser extensions
+
+**Example protection:**
+```javascript
+// Even if a malicious API returns this:
+const maliciousResponse = '<script>stealCredentials()</script>';
+
+// And buggy code does this:
+container.innerHTML = maliciousResponse;
+
+// CSP blocks the script from executing!
+// Browser console shows: "Refused to execute inline script"
+```
+
+### XSS Prevention
+
+All user-controlled and external data is sanitized before display:
+
+**Safe DOM Manipulation:**
+```javascript
+// ❌ UNSAFE (vulnerable to XSS)
+container.innerHTML = userInput;
+
+// ✅ SAFE (CSP-compliant)
+container.textContent = userInput;
+// or
+const div = document.createElement('div');
+div.textContent = userInput;
+container.appendChild(div);
+```
+
+**Implementation:**
+- ✅ All `innerHTML` usage eliminated from extension pages
+- ✅ User inputs displayed via `textContent` (auto-escapes)
+- ✅ Dynamic content created with `createElement()` + `textContent`
+- ✅ No string concatenation for HTML generation
+
+**Protection layers:**
+1. **Input validation** - Sanitize before use
+2. **Output encoding** - Use `textContent` instead of `innerHTML`
+3. **Content Security Policy** - Block execution even if bypassed
+
+### Rate Limiting
+
+Protection against brute force attacks:
+
+**Login attempts:**
+```javascript
+// After failed login:
+- Button disabled for 2 seconds
+- Visual feedback: "Wait 2s..."
+- Limits attempts to ~30 per minute
+- Prevents automated brute force
+```
+
+**Implementation:**
+```javascript
+// popup.js
+try {
+  await wallet.login(username, password, pin);
+} catch (error) {
+  // Rate limit: 2-second lockout
+  loginBtn.disabled = true;
+  loginBtn.textContent = 'Wait 2s...';
+  
+  setTimeout(() => {
+    loginBtn.disabled = false;
+    loginBtn.textContent = 'Login';
+  }, 2000);
+}
+```
+
+**Additional protections:**
+- Nexus API enforces server-side rate limiting
+- Account lockout after too many failed attempts (API-level)
+- Failed attempts logged for security monitoring
+
+### Input Validation
+
+All user inputs are validated before processing:
+
+**Transaction validation:**
+```javascript
+// Amount validation
+if (isNaN(amount) || amount <= 0) {
+  throw new Error('Invalid amount');
+}
+
+// Reference validation (64-bit unsigned integer)
+if (reference !== undefined) {
+  const refNum = BigInt(reference);
+  if (refNum < 0n || refNum > 18446744073709551615n) {
+    throw new Error('Invalid reference');
+  }
+}
+
+// Address validation
+if (!to || to.trim() === '') {
+  throw new Error('Recipient address required');
+}
+```
+
+**URL validation:**
+```javascript
+// HTTPS enforcement for remote nodes
+const urlObj = new URL(nodeUrl);
+if (urlObj.hostname !== 'localhost' && 
+    urlObj.hostname !== '127.0.0.1' &&
+    !urlObj.hostname.startsWith('192.168.') &&
+    !urlObj.hostname.startsWith('10.') &&
+    urlObj.protocol === 'http:') {
+  throw new Error('HTTPS required for remote connections');
+}
+```
+
+### No Unsafe Code Patterns
+
+**What we DON'T use:**
+- ❌ `eval()` - Never used
+- ❌ `Function()` constructor - Never used
+- ❌ `setTimeout(string)` - Never used
+- ❌ `setInterval(string)` - Never used
+- ❌ `innerHTML` with dynamic content - Eliminated
+- ❌ Inline event handlers - Not used
+- ❌ `dangerouslySetInnerHTML` - Not applicable (vanilla JS)
+
+**Code verification:**
+```bash
+# Verify no unsafe patterns
+grep -r "eval(" *.js          # ✅ None found
+grep -r "innerHTML" *.js       # ✅ Only safe debug logs
+grep -r "onclick=" *.html      # ✅ None in extension pages
+```
+
 ## Threat Model
 
 ### Threats We Protect Against
@@ -177,6 +337,10 @@ await storage.clearSession();  // Removes session + PIN
 | **Unauthorized transactions** | ✅ PIN required for all transactions |
 | **Session hijacking** | ✅ Sessions terminated on logout/close (local data always cleared) |
 | **Disk forensics (fallback mode)** | ✅ Data encrypted, key in memory only (unrecoverable) |
+| **XSS attacks** | ✅ Content Security Policy + textContent usage |
+| **Code injection** | ✅ CSP blocks eval(), inline scripts, and unsafe patterns |
+| **Brute force login** | ✅ Rate limiting (2-second delay after failed attempts) |
+| **Malicious API responses** | ✅ CSP prevents script execution from compromised node |
 
 ### Threats We Don't Protect Against
 
@@ -274,10 +438,14 @@ This wallet is open source for several reasons:
 
 **Critical files:**
 ```
-services/storage.js      - Session storage implementation
-services/wallet.js       - Session management and PIN handling
-background.js           - Service worker, session cleanup
-services/nexus-api.js   - API communication (no credential leakage)
+manifest.json           - Content Security Policy configuration
+services/storage.js     - Session storage implementation
+services/wallet.js      - Session management and PIN handling
+background.js          - Service worker, session cleanup
+services/nexus-api.js  - API communication (no credential leakage)
+popup.js               - UI logic (XSS prevention, rate limiting)
+content.js             - Content script injection
+inpage.js              - dApp provider (isolated execution)
 ```
 
 **Key security checks:**
@@ -286,6 +454,11 @@ services/nexus-api.js   - API communication (no credential leakage)
 - ✅ Proper cleanup on logout/browser close
 - ✅ HTTPS enforcement for remote nodes
 - ✅ Session termination on blockchain
+- ✅ Content Security Policy properly configured
+- ✅ No eval() or Function() usage
+- ✅ No innerHTML with dynamic content
+- ✅ Rate limiting on authentication
+- ✅ Input validation on all user inputs
 
 ### Reporting Security Issues
 

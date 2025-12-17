@@ -29,10 +29,17 @@ A secure cryptocurrency wallet browser extension for the Nexus blockchain, simil
 - 🚫 **XSS Prevention** - All user inputs sanitized, no innerHTML with dynamic content
 - ⏱️ **Rate Limiting** - Protection against brute force attacks (2-second delay after failed login)
 - 🔐 **HTTPS Enforcement** - Remote nodes require HTTPS connections
-- �🚪 **Lock/Unlock** - Lock your wallet when not in use
+- 🚪 **Lock/Unlock** - Lock your wallet when not in use
 - 👁️ **Automatic Session Cleanup** - Sessions automatically terminated on logout or browser close
 - 🛡️ **Defense in Depth** - Multiple layers of security protection
 - 🔒 **Blockchain Session Termination** - Active sessions properly terminated on Nexus node on logout/browser close
+
+### Quantum Resistance
+- 🛡️ **Quantum-Resistant SigChains** - Protected by Nexus blockchain's signature chain technology
+- 🔐 **One-Time Keypairs** - Each transaction uses a unique keypair, never reused
+- 🚫 **No Public Key Reuse** - Eliminates vulnerability to quantum attacks via Shor's algorithm
+- ⚛️ **Post-Quantum Ready** - Future-proof security architecture resistant to quantum computing threats
+- 🔑 **Hardware-Like Security** - SigChain architecture provides security similar to hardware wallets
 
 ## Installation
 

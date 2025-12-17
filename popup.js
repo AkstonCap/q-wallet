@@ -375,6 +375,12 @@ async function loadWalletData() {
     // Update account info
     document.getElementById('account-name').textContent = walletInfo.username || 'Default Account';
     
+    // Show quantum security badge when logged in
+    const quantumBadge = document.getElementById('quantum-badge');
+    if (quantumBadge) {
+      quantumBadge.style.display = 'flex';
+    }
+    
     console.log('Loading accounts...');
     // Get all accounts (each token has its own account with unique address)
     const accounts = await wallet.listAccounts();

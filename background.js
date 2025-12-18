@@ -180,6 +180,9 @@ async function handleMessage(request, sender) {
     
     case 'account.getAllBalances':
       return { result: await wallet.getAllBalances() };
+    
+    case 'account.listAccounts':
+      return { result: await wallet.api.listAccounts(wallet.session) };
 
     // Transactions
     case 'transaction.send':
@@ -254,6 +257,14 @@ async function handleMessage(request, sender) {
       console.log('Origin:', params.origin);
       // Allow site to disconnect itself without approval
       return await handleDAppDisconnect(params.origin, sender.url);
+
+    case 'dapp.getAllBalances':
+      console.log('=== dapp.getAllBalances case triggered ===');
+      await checkDAppPermission(params.origin, sender.url);
+      if (!wallet.isLoggedIn()) {
+        throw new Error('Wallet not connected');
+      }
+      return { result: await wallet.getAllBalances() };
 
     default:
       throw new Error(`Unknown method: ${method}`);
@@ -801,6 +812,11 @@ async function handleDAppBatchCalls(params) {
     throw new Error('PIN is required for API calls');
   }
   
+  if (!approval.distAccount) {
+    console.log('ERROR: No DIST account selected');
+    throw new Error('DIST account selection is required for fee payment');
+  }
+  
   // Verify wallet state
   if (!wallet.session) {
     throw new Error('Wallet session not available. Please log in again.');
@@ -837,17 +853,17 @@ async function handleDAppBatchCalls(params) {
   
   // Charge DIST service fee if any calls succeeded
   if (results.some(r => r.success)) {
-    const DISTORDIA_PAYMENT_ADDRESS = ''
+    const DISTORDIA_PAYMENT_ACCOUNT = 'DIST';
     try {
-      await wallet.api.debit(
-        DISTORDIA_PAYMENT_ADDRESS,
-        distFee,
-        'DIST',
-        approval.pin,
-        '',
-        wallet.session
-      );
-      console.log(`DIST service fee charged: ${distFee} DIST for ${calls.length} API calls`);
+      // Debit DIST tokens from selected account
+      await wallet.api.request('finance/debit/account', {
+        from: approval.distAccount,
+        to: DISTORDIA_PAYMENT_ACCOUNT,
+        amount: distFee,
+        pin: approval.pin,
+        session: wallet.session
+      });
+      console.log(`DIST service fee charged: ${distFee} DIST from account ${approval.distAccount}`);
     } catch (feeError) {
       console.error('Failed to charge DIST service fee:', feeError);
       // Don't fail the batch if fee payment fails

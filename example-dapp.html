@@ -141,11 +141,11 @@
 
     <!-- Balance Section -->
     <div class="section">
-      <h3>2. Get Balance</h3>
-      <button id="balance-btn" onclick="getBalance()" disabled>Get Balance</button>
+      <h3>2. Get Balances</h3>
+      <button id="balance-btn" onclick="getBalances()" disabled>Get Balances</button>
       
       <div id="balance-info" style="display: none;">
-        <div class="label">Balance:</div>
+        <div class="label">Balances:</div>
         <div class="info-item" id="balance-amount"></div>
       </div>
     </div>
@@ -354,14 +354,38 @@ if (typeof window.nexus !== 'undefined') {
       }
     }
 
-    // Get balance
-    async function getBalance() {
+    // Get balances
+    async function getBalances() {
       try {
-        const balance = await window.nexus.getBalance();
-        document.getElementById('balance-amount').textContent = 
-          `${balance.balance} ${balance.token || 'NXS'}`;
+        const response = await window.nexus.getAllBalances();
+        console.log('getAllBalances response:', response);
+        
+        // Extract balances array from response
+        const balances = response.result || response;
+        console.log('Balances data:', balances);
+        
+        const balanceContainer = document.getElementById('balance-amount');
+        balanceContainer.innerHTML = '';
+        
+        // Handle both array and object formats
+        const balanceArray = Array.isArray(balances) ? balances : [balances];
+        
+        if (!balances || (Array.isArray(balances) && balances.length === 0)) {
+          balanceContainer.textContent = 'No balances found';
+        } else {
+          // Display each token balance
+          balanceArray.forEach(balance => {
+            const balanceDiv = document.createElement('div');
+            balanceDiv.style.marginBottom = '4px';
+            const ticker = balance.ticker || 'Unknown';
+            const available = balance.available || 0;
+            balanceDiv.textContent = `${ticker}: ${available}`;
+            balanceContainer.appendChild(balanceDiv);
+          });
+        }
+        
         document.getElementById('balance-info').style.display = 'block';
-        updateStatus('Balance retrieved successfully!', 'connected');
+        updateStatus('Balances retrieved successfully!', 'connected');
       } catch (error) {
         console.error('Get balance failed:', error);
         updateStatus('Failed to get balance: ' + error.message, 'error');
@@ -416,8 +440,8 @@ if (typeof window.nexus !== 'undefined') {
             const item = document.createElement('div');
             item.className = 'info-item';
             
-            const typeText = tx.type || 'Transaction';
-            const amountText = `${tx.amount || 0} NXS`;
+            const typeText = tx.contracts[0]?.OP || 'Transaction';
+            const amountText = `${tx.contracts[0]?.amount || 0} ${tx.contracts[0]?.ticker || 'NXS'}`;
             item.appendChild(document.createTextNode(`${typeText} - ${amountText}`));
             
             item.appendChild(document.createElement('br'));

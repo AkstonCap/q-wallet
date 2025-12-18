@@ -941,11 +941,15 @@ function showPinModal(fromAccount, toAddress, amount, reference) {
   document.getElementById('modal-to-address').title = toAddress; // Full address on hover
   document.getElementById('modal-amount').textContent = `${formatAmount(amount)} ${ticker}`;
   
-  // Update total to show fees with breakdown
+  // Update fee row
+  document.getElementById('modal-fee').textContent = `${formatAmount(totalFees)} NXS`;
+  document.getElementById('modal-fee-details').textContent = `Nexus: ${formatAmount(nexusFee)} + Service: ${formatAmount(distordiaFee)}`;
+  
+  // Update total
   if (isNXS) {
-    document.getElementById('modal-total').textContent = `${formatAmount(total)} NXS (incl. ${formatAmount(totalFees)} fees)`;
+    document.getElementById('modal-total').textContent = `${formatAmount(total)} NXS`;
   } else {
-    document.getElementById('modal-total').textContent = `${formatAmount(amount)} ${ticker} + ${formatAmount(totalFees)} NXS fees`;
+    document.getElementById('modal-total').textContent = `${formatAmount(amount)} ${ticker} + ${formatAmount(totalFees)} NXS`;
   }
   
   // Show/hide reference row
@@ -1119,7 +1123,8 @@ function updateTransactionSummary() {
   const total = isNXS ? amount + totalFees : amount;
 
   document.getElementById('summary-amount').textContent = formatAmount(amount) + ' ' + ticker;
-  document.getElementById('summary-fee').textContent = formatAmount(totalFees) + ' NXS (Nexus: ' + formatAmount(nexusFee) + ' + Service: ' + formatAmount(distordiaFee) + ')';
+  document.getElementById('summary-fee').textContent = formatAmount(totalFees) + ' NXS';
+  document.getElementById('summary-fee-details').textContent = '(Nexus: ' + formatAmount(nexusFee) + ' + Service: ' + formatAmount(distordiaFee) + ')';
   
   if (isNXS) {
     document.getElementById('summary-total').textContent = formatAmount(total) + ' NXS';

@@ -123,6 +123,20 @@
       }
     }
 
+    // Get all token balances
+    async getAllBalances() {
+      try {
+        const result = await this.request({
+          method: 'dapp.getAllBalances',
+          params: {}
+        });
+        return result;
+      } catch (error) {
+        console.error('Failed to get all balances:', error);
+        throw error;
+      }
+    }
+
     // Send NXS or tokens
     async sendTransaction({ from, to, amount, reference }) {
       try {

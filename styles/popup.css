@@ -648,6 +648,17 @@ body {
   font-size: 16px;
 }
 
+.summary-row.fee-explanation {
+  margin-top: -4px;
+  margin-bottom: 8px;
+}
+
+.fee-details {
+  font-size: 11px;
+  color: #666;
+  text-align: right;
+}
+
 /* QR Code */
 .qr-container {
   margin: 20px 0;
@@ -841,6 +852,7 @@ body {
   padding-top: 8px;
   border-top: 1px solid var(--border);
   font-weight: 600;
+  font-size: 14px;
   margin-top: 8px;
 }
 

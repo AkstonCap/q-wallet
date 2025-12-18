@@ -24,7 +24,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Display details
   document.getElementById('origin').textContent = origin || 'Unknown';
   document.getElementById('total-calls').textContent = callsData.length;
-  document.getElementById('dist-fee').textContent = `${distFee} NXS`;
+  document.getElementById('dist-fee').textContent = `${distFee} DIST`;
+  
+  // Load DIST accounts
+  loadDistAccounts();
   
   // Populate calls list
   displayCalls();
@@ -85,6 +88,56 @@ function displayCalls() {
     callItem.appendChild(callParams);
     container.appendChild(callItem);
   });
+}
+
+// Load DIST accounts with balance >= 1
+async function loadDistAccounts() {
+  const select = document.getElementById('dist-account-select');
+  const approveBtn = document.getElementById('approve-btn');
+  
+  try {
+    // List all accounts using finance/list/account API
+    const response = await chrome.runtime.sendMessage({
+      method: 'account.listAccounts',
+      params: {}
+    });
+    
+    if (response.error) {
+      throw new Error(response.error);
+    }
+    
+    const accounts = response.result || [];
+    
+    // Filter for DIST accounts with balance >= 1
+    const distAccounts = accounts.filter(account => {
+      const balance = parseFloat(account.balance || 0);
+      return account.token_name === 'DIST' && balance >= 1;
+    });
+    
+    // Clear loading option
+    select.innerHTML = '';
+    
+    if (distAccounts.length === 0) {
+      select.innerHTML = '<option value="">No DIST accounts with sufficient balance</option>';
+      approveBtn.disabled = true;
+      approveBtn.title = 'You need at least 1 DIST token to pay the service fee';
+      return;
+    }
+    
+    // Populate dropdown with DIST accounts
+    distAccounts.forEach(account => {
+      const option = document.createElement('option');
+      option.value = account.address;
+      option.textContent = `${account.name || account.address} (${account.balance} DIST)`;
+      select.appendChild(option);
+    });
+    
+    approveBtn.disabled = false;
+  } catch (error) {
+    console.error('Failed to load DIST accounts:', error);
+    select.innerHTML = '<option value="">Error loading accounts</option>';
+    approveBtn.disabled = true;
+  }
 }
 
 // Setup event listeners

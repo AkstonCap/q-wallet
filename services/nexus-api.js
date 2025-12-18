@@ -21,6 +21,22 @@ class NexusAPI {
         throw new Error('HTTPS is required for remote connections. Use https:// instead of http://');
       }
       
+      // SECURITY WARNING: Recommend TLS 1.3+ for quantum resistance
+      // Note: Browser enforces TLS version, but users should verify their node uses modern TLS
+      if (urlObj.protocol === 'https:') {
+        console.warn(
+          '%c⚠️ QUANTUM SECURITY NOTICE',
+          'color: #ff6600; font-weight: bold; font-size: 14px',
+          '\n\nFor optimal quantum resistance, ensure your Nexus node uses:\n' +
+          '  • TLS 1.3 or higher\n' +
+          '  • Modern cipher suites (AES-256-GCM, ChaCha20-Poly1305)\n' +
+          '  • Up-to-date certificates\n\n' +
+          'While Nexus SigChains provide quantum-resistant transactions,\n' +
+          'weak TLS versions may expose data in transit.\n\n' +
+          'Contact your node operator to verify TLS configuration.'
+        );
+      }
+      
       this.nodeUrl = url;
     } catch (error) {
       if (error.message.includes('HTTPS is required')) {
@@ -96,8 +112,8 @@ class NexusAPI {
   }
 
   // Terminate session (logout)
-  async terminateSession(session) {
-    return this.request('sessions/terminate/local', { session });
+  async terminateSession(session, pin) {
+    return this.request('sessions/terminate/local', { session, pin });
   }
 
   // Unlock session with PIN

@@ -239,10 +239,10 @@ console.log(`Balance: ${balance} NXS`);
 Request to send a transaction. Shows approval popup to user with PIN requirement.
 
 **Parameters:**
-- `params.from` (string): Sender account name
+- `params.from` (string, optional): Sender account name, defaults to 'default'
 - `params.to` (string): Recipient address or username
 - `params.amount` (number): Amount to send in NXS
-- `params.reference` (string, optional): Transaction memo
+- `params.reference` (integer, optional): Transaction memo (64-bit unsigned integer or omit)
 
 **Returns:** `Promise<object>` - Transaction result with txid
 
@@ -252,10 +252,87 @@ const result = await window.nexus.sendTransaction({
   from: 'default',
   to: 'recipient',
   amount: 10.5,
-  reference: 'Payment'
+  reference: 12345
 });
 console.log('TX:', result.txid);
 ```
+
+### window.nexus.sendBatchTransactions(transactions)
+Send multiple debit transactions in a single approval. All transactions share the same PIN entry.
+
+**Parameters:**
+- `transactions` (array): Array of transaction objects, each with:
+  - `from` (string, optional): Sender account name or address, defaults to 'default'
+  - `to` (string): Recipient address or username:accountName (must be same token as from)
+  - `amount` (number): Amount to send in token
+  - `reference` (integer, optional): Transaction memo (64-bit unsigned integer or omit)
+
+**Returns:** `Promise<object>` - Result with successful and failed transactions
+
+**Example:**
+```javascript
+const result = await window.nexus.sendBatchTransactions([
+  { to: 'alice', amount: 10, reference: 1 },
+  { to: 'bob', amount: 20, reference: 2 },
+  { from: 'savings', to: 'charlie', amount: 5 }
+]);
+console.log(`${result.successful} of ${result.total} transactions completed`);
+```
+
+### window.nexus.executeBatchCalls(calls)
+Execute multiple different Nexus API operations in a single approval. This is for advanced use cases where you need to perform multiple API calls (debits, market orders, etc.) atomically with one PIN entry.
+
+**Service Fees (paid in DIST):**
+- 1-4 calls: 1 NXS
+- 5-8 calls: 2 NXS
+- 9-12 calls: 3 NXS
+- Maximum: 12 calls per batch
+
+**Note:** Nexus blockchain also charges approximately 0.01 NXS per API call when multiple calls are made within 10 seconds.
+
+**Parameters:**
+- `calls` (array): Array of API call objects (max 12), each with:
+  - `endpoint` (string): Nexus API endpoint (e.g., 'finance/debit/account', 'market/execute/order')
+  - `params` (object): Parameters for that API call
+
+**Returns:** `Promise<object>` - Result with:
+  - `successfulCalls` (number): Number of successful operations
+  - `totalCalls` (number): Total operations attempted
+  - `distFee` (number): DIST service fee charged
+  - `results` (array): Individual API call results
+
+**Example:**
+```javascript
+// Execute market orders and pay a fee in a single approval
+const result = await window.nexus.executeBatchCalls([
+  {
+    endpoint: 'market/execute/order',
+    params: { txid: 'orderID1', from: 'accountSend', to: 'accountRecieval' }
+  },
+  {
+    endpoint: 'market/execute/order',
+    params: { txid: 'orderID2', from: 'accountSend', to: 'accountRecieval' }
+  },
+  {
+    endpoint: 'market/create/bid',
+    params: { market: 'DIST/NXS', from: 'default', to: 'dist-account', price: 0.1, amount: 1 }
+  },
+  {
+    endpoint: 'finance/debit/account',
+    params: { from: 'default', to: 'feeAccount', amount: 1 }
+  }
+]);
+
+console.log(`${result.successfulCalls}/${result.totalCalls} operations completed`);
+console.log(`DIST service fee: ${result.distFee} NXS`);
+// Plus ~0.04 NXS Nexus network fee for 4 calls within 10 seconds
+```
+
+**Important:** 
+- All calls share the same wallet session and PIN
+- Execution stops at first failure
+- DIST service fee is only charged if at least one call succeeds
+- User sees all operations and fees in the approval popup
 
 ### window.nexus.getTransactionHistory(limit)
 Get transaction history for the connected account.
@@ -279,6 +356,19 @@ Check if wallet is currently connected.
 ```javascript
 const connected = await window.nexus.isWalletConnected();
 ```
+
+### window.nexus.disconnect()
+Disconnect the site from the wallet. This revokes the site's own connection without requiring user approval.
+
+**Returns:** `Promise<object>` - Result with success status
+
+**Example:**
+```javascript
+await window.nexus.disconnect();
+console.log('Successfully disconnected from wallet');
+```
+
+**Note:** This allows a site to programmatically disconnect itself. Users can also revoke connections manually from the wallet Settings → Connected Sites.
 
 ## Error Handling
 
@@ -327,7 +417,22 @@ async function ensureConnection() {
 }
 ```
 
-### 3. Validate User Input
+### 3. Provide Disconnect Option
+
+```javascript
+// Add a disconnect button for users who want to disconnect your site
+async function handleDisconnect() {
+  try {
+    await window.nexus.disconnect();
+    alert('Successfully disconnected from wallet');
+    // Update UI to show disconnected state
+  } catch (error) {
+    console.error('Disconnect failed:', error);
+  }
+}
+```
+
+### 4. Validate User Input
 
 ```javascript
 async function sendTransaction() {

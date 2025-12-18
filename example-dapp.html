@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nexus dApp Example</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #0066ff;
+      margin-bottom: 10px;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+    }
+    .status {
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 0;
+      background: #f8f9fa;
+      border-left: 4px solid #0066ff;
+    }
+    .status.connected {
+      background: #d4edda;
+      border-left-color: #28a745;
+    }
+    .status.error {
+      background: #f8d7da;
+      border-left-color: #dc3545;
+    }
+    button {
+      background: #0066ff;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 5px;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #0052cc;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .section {
+      margin: 30px 0;
+      padding: 20px;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+    }
+    .section h3 {
+      margin-top: 0;
+      color: #333;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #dee2e6;
+      border-radius: 6px;
+      font-size: 14px;
+      margin: 8px 0;
+      box-sizing: border-box;
+    }
+    .info-item {
+      margin: 10px 0;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      word-break: break-all;
+    }
+    .label {
+      font-weight: 600;
+      color: #666;
+      margin-bottom: 5px;
+    }
+    code {
+      background: #f8f9fa;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 13px;
+    }
+    .warning {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      padding: 15px;
+      border-radius: 6px;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Nexus dApp Example</h1>
+    <p class="subtitle">Test your Nexus Wallet browser extension integration</p>
+
+    <div id="wallet-status" class="status">
+      Wallet Status: <span id="status-text">Checking...</span>
+    </div>
+
+    <div class="warning">
+      ⚠️ <strong>Security Features:</strong>
+      <ul style="margin: 10px 0 0 20px;">
+        <li>First connection requires explicit approval via notification</li>
+        <li>Only approved sites can access wallet functions</li>
+        <li>Manage connected sites in Settings → Connected Sites</li>
+        <li>Revoke access anytime from the wallet settings</li>
+      </ul>
+    </div>
+
+    <!-- Connection Section -->
+    <div class="section">
+      <h3>1. Connect Wallet</h3>
+      <button id="connect-btn" onclick="connectWallet()">Connect Wallet</button>
+      <button id="check-btn" onclick="checkConnection()">Check Connection</button>
+      <button id="disconnect-btn" onclick="disconnectWallet()" style="display: none; background: #dc3545;">Disconnect Wallet</button>
+      
+      <div id="account-info" style="display: none;">
+        <div class="label">Connected Account:</div>
+        <div class="info-item" id="account-address"></div>
+      </div>
+    </div>
+
+    <!-- Balance Section -->
+    <div class="section">
+      <h3>2. Get Balance</h3>
+      <button id="balance-btn" onclick="getBalance()" disabled>Get Balance</button>
+      
+      <div id="balance-info" style="display: none;">
+        <div class="label">Balance:</div>
+        <div class="info-item" id="balance-amount"></div>
+      </div>
+    </div>
+
+    <!-- Send Transaction Section -->
+    <div class="section">
+      <h3>3. Send Transaction</h3>
+      <input type="text" id="send-to" placeholder="Recipient address or username">
+      <input type="number" id="send-amount" placeholder="Amount (NXS)" step="0.01" min="0">
+      <input type="text" id="send-reference" placeholder="Reference (optional)">
+      <button id="send-btn" onclick="sendTransaction()" disabled>Send Transaction</button>
+      
+      <div id="tx-result" style="display: none;">
+        <div class="label">Transaction Result:</div>
+        <div class="info-item" id="tx-data"></div>
+      </div>
+    </div>
+
+    <!-- Transaction History Section -->
+    <div class="section">
+      <h3>4. Transaction History</h3>
+      <button id="history-btn" onclick="getHistory()" disabled>Get Transaction History</button>
+      
+      <div id="history-info" style="display: none;">
+        <div class="label">Recent Transactions:</div>
+        <div id="history-list"></div>
+      </div>
+    </div>
+
+    <!-- Batch Transactions Section -->
+    <div class="section">
+      <h3>5. Send Batch Transactions</h3>
+      <p>Send multiple transactions with a single approval</p>
+      <input type="text" id="batch-tx-to-1" placeholder="Transaction 1: Recipient">
+      <input type="number" id="batch-tx-amount-1" placeholder="Transaction 1: Amount" step="0.01" min="0">
+      <input type="text" id="batch-tx-ref-1" placeholder="Transaction 1: Reference (optional)">
+      <br>
+      <input type="text" id="batch-tx-to-2" placeholder="Transaction 2: Recipient">
+      <input type="number" id="batch-tx-amount-2" placeholder="Transaction 2: Amount" step="0.01" min="0">
+      <input type="text" id="batch-tx-ref-2" placeholder="Transaction 2: Reference (optional)">
+      <button id="batch-tx-btn" onclick="sendBatchTx()" disabled>Send Batch Transactions</button>
+      
+      <div id="batch-tx-result" style="display: none;">
+        <div class="label">Batch Result:</div>
+        <div class="info-item" id="batch-tx-data"></div>
+      </div>
+    </div>
+
+    <!-- Batch API Calls Section -->
+    <div class="section">
+      <h3>6. Execute Batch API Calls</h3>
+      <p>Execute multiple API calls with a single approval (2x market/create/bid)</p>
+      <input type="text" id="batch-call-asset-1" placeholder="Call 1: Asset address">
+      <input type="number" id="batch-call-price-1" placeholder="Call 1: Price" step="0.01" min="0">
+      <br>
+      <input type="text" id="batch-call-asset-2" placeholder="Call 2: Asset address">
+      <input type="number" id="batch-call-price-2" placeholder="Call 2: Price" step="0.01" min="0">
+      <button id="batch-call-btn" onclick="executeBatchApiCalls()" disabled>Execute Batch Calls</button>
+      
+      <div id="batch-call-result" style="display: none;">
+        <div class="label">Batch API Result:</div>
+        <div class="info-item" id="batch-call-data"></div>
+      </div>
+    </div>
+
+    <!-- Code Example -->
+    <div class="section">
+      <h3>Developer Reference</h3>
+      <p>Example code to integrate Nexus Wallet in your dApp:</p>
+      <pre style="background: #f8f9fa; padding: 15px; border-radius: 6px; overflow-x: auto;"><code>// Check if wallet is available
+if (typeof window.nexus !== 'undefined') {
+  // Connect to wallet
+  const accounts = await window.nexus.connect();
+  console.log('Connected:', accounts[0]);
+  
+  // Get balance
+  const balance = await window.nexus.getBalance();
+  console.log('Balance:', balance);
+  
+  // Send transaction
+  const tx = await window.nexus.sendTransaction({
+    to: ent-address',
+    amount: 10.5,
+    reference: 'Payment'
+  });
+  console.log('Transaction:', tx);
+}</code></pre>
+    </div>
+  </div>
+
+  <script>
+    let connectedAccount = null;
+
+    // Check if Nexus Wallet is installed
+    async function checkWalletInstalled() {
+      if (typeof window.nexus === 'undefined') {
+        updateStatus('Nexus Wallet not detected! Please ithe extension.', 'error');
+        return false;
+      }
+      updateStatus('Nexus Wallet detected!', 'connected');
+      return true;
+    }
+
+    // Connect to wallet
+    async function connectWallet() {
+      try {
+        if (!await checkWalletInstalled()) return;
+
+        updateStatus('Connecting to wallet...', '');
+        const accounts = await window.nexus.connect()   
+        if (accounts && accounts.length > 0) {
+          connectedAccount = accounts[0];
+          updateStatus('Connected to wallet!', 'connected');
+          document.getElementById('account-address').textContent = connectedAccount;
+          document.getElementById('account-info').style.display = 'block';
+          
+          // Show disconnect button, hide connect button
+          document.getElementById('connect-btn').style.display = 'none';
+          document.getElementById('disconnect-btn').style.display = 'inline-block';
+          
+          // Enable buttons
+          document.getElementById('balance-btn').disabled = false;
+          document.getElementById('send-btn').disabled = false;
+          document.getElementById('history-btn').disabled = false;
+          document.getElementById('batch-tx-btn').disabled = false;
+          document.getElementById('batch-call-btn').disabled = false;
+        } else {
+          updateStatus('No accounts found. Please log in to your wallet.', 'error');
+        }
+      } catch (error) {
+        console.error('Connection failed:', error);
+        updateStatus('Connection failed: ' + error.message, 'error');
+      }
+    }
+
+    // Disconnect wallet
+    async function disconnectWallet() {
+      try {
+        // Call the wallet API to disconnect
+        await window.nexus.disconnect();
+        
+        connectedAccount = null;
+        
+        // Update UI
+        updateStatus('Wallet disconnected successfully', '');
+        document.getElementById('account-info').style.display = 'none';
+        document.getElementById('balance-info').style.display = 'none';
+        document.getElementById('tx-result').style.display = 'none';
+        document.getElementById('history-info').style.display = 'none';
+        
+        // Show connect button, hide disconnect button
+        document.getElementById('connect-btn').style.display = 'inline-block';
+        document.getElementById('disconnect-btn').style.display = 'none';
+        
+        // Disable buttons
+        document.getElementById('balance-btn').disabled = true;
+        document.getElementById('send-btn').disabled = true;
+        document.getElementById('history-btn').disabled = true;
+        document.getElementById('batch-tx-btn').disabled = true;
+        document.getElementById('batch-call-btn').disabled = true;
+        
+        alert('Successfully disconnected from wallet!');
+      } catch (error) {
+        console.error('Disconnect failed:', error);
+        updateStatus('Failed to disconnect: ' + error.message, 'error');
+      }
+    }
+
+    // Check connection status
+    async function checkConnection() {
+      try {
+        if (!await checkWalletInstalled()) return;
+
+        const isConnected = await window.nexus.isWalletConnected();
+        if (isConnected) {
+          const accounts = await window.nexus.getAccounts();
+          connectedAccount = accounts[0];
+          updateStatus('Wallet is connected!', 'connected');
+          document.getElementById('account-address').textContent = connectedAccount;
+          document.getElementById('account-info').style.display = 'block';
+          
+          // Show disconnect button, hide connect button
+          document.getElementById('connect-btn').style.display = 'none';
+          document.getElementById('disconnect-btn').style.display = 'inline-block';
+          
+          // Enable buttons
+          document.getElementById('balance-btn').disabled = false;
+          document.getElementById('send-btn').disabled = false;
+          document.getElementById('history-btn').disabled = false;          document.getElementById('batch-tx-btn').disabled = false;
+          document.getElementById('batch-call-btn').disabled = false;        } else {
+          updateStatus('Wallet not connected. Click "Connect Wallet" button.', '');
+          
+          // Show connect button, hide disconnect button
+          document.getElementById('connect-btn').style.display = 'inline-block';
+          document.getElementById('disconnect-btn').style.display = 'none';
+        }
+      } catch (error) {
+        console.error('Check failed:', error);
+        updateStatus('Check failed: ' + error.message, 'error');
+      }
+    }
+
+    // Get balance
+    async function getBalance() {
+      try {
+        const balance = await window.nexus.getBalance();
+        document.getElementById('balance-amount').textContent = 
+          `${balance.balance} ${balance.token || 'NXS'}`;
+        document.getElementById('balance-info').style.display = 'block';
+        updateStatus('Balance retrieved successfully!', 'connected');
+      } catch (error) {
+        console.error('Get balance failed:', error);
+        updateStatus('Failed to get balance: ' + error.message, 'error');
+      }
+    }
+
+    // Send transaction
+    async function sendTransaction() {
+      try {
+        const to = document.getElementById('send-to').value.trim();
+        const amount = parseFloat(document.getElementById('send-amount').value);
+        const reference = document.getElementById('send-reference').value.trim();
+
+        if (!to || !amount) {
+          alert('Please enter recipient and amount');
+          return;
+        }
+
+        updateStatus('Sending transaction...', '');
+        
+        const result = await window.nexus.sendTransaction({
+          to: to,
+          amount: amount,
+          reference: reference
+        });
+
+        document.getElementById('tx-data').textContent = JSON.stringify(result, null, 2);
+        document.getElementById('tx-result').style.display = 'block';
+        updateStatus('Transaction sent successfully!', 'connected');
+
+        // Clear form
+        document.getElementById('send-to').value = '';
+        document.getElementById('send-amount').value = '';
+        document.getElementById('send-reference').value = '';
+      } catch (error) {
+        console.error('Send transaction failed:', error);
+        updateStatus('Transaction failed: ' + error.message, 'error');
+      }
+    }
+
+    // Get transaction history
+    async function getHistory() {
+      try {
+        const transactions = await window.nexus.getTransactionHistory(10);
+        const historyList = document.getElementById('history-list');
+        
+        if (!transactions || transactions.length === 0) {
+          historyList.innerHTML = '<div class="info-item">No transactions found</div>';
+        } else {
+          historyList.textContent = '';
+          transactions.forEach((tx) => {
+            const item = document.createElement('div');
+            item.className = 'info-item';
+            
+            const typeText = tx.type || 'Transaction';
+            const amountText = `${tx.amount || 0} NXS`;
+            item.appendChild(document.createTextNode(`${typeText} - ${amountText}`));
+            
+            item.appendChild(document.createElement('br'));
+            const small = document.createElement('small');
+            small.textContent = new Date(tx.timestamp * 1000).toLocaleString();
+            item.appendChild(small);
+            
+            historyList.appendChild(item);
+          });
+        }
+        
+        document.getElementById('history-info').style.display = 'block';
+        updateStatus('Transaction history retrieved!', 'connected');
+      } catch (error) {
+        console.error('Get history failed:', error);
+        updateStatus('Failed to get history: ' + error.message, 'error');
+      }
+    }
+
+    // Send batch transactions
+    async function sendBatchTx() {
+      try {
+        const to1 = document.getElementById('batch-tx-to-1').value.trim();
+        const amount1 = parseFloat(document.getElementById('batch-tx-amount-1').value);
+        const ref1 = document.getElementById('batch-tx-ref-1').value.trim();
+        
+        const to2 = document.getElementById('batch-tx-to-2').value.trim();
+        const amount2 = parseFloat(document.getElementById('batch-tx-amount-2').value);
+        const ref2 = document.getElementById('batch-tx-ref-2').value.trim();
+
+        if (!to1 || !amount1 || !to2 || !amount2) {
+          alert('Please fill in both transactions (recipient and amount required)');
+          return;
+        }
+
+        updateStatus('Sending batch transactions...', '');
+        
+        const transactions = [
+          {
+            to: to1,
+            amount: amount1,
+            ...(ref1 && { reference: ref1 })
+          },
+          {
+            to: to2,
+            amount: amount2,
+            ...(ref2 && { reference: ref2 })
+          }
+        ];
+
+        const result = await window.nexus.sendBatchTransactions(transactions);
+
+        document.getElementById('batch-tx-data').textContent = JSON.stringify(result, null, 2);
+        document.getElementById('batch-tx-result').style.display = 'block';
+        updateStatus('Batch transactions sent successfully!', 'connected');
+
+        // Clear form
+        document.getElementById('batch-tx-to-1').value = '';
+        document.getElementById('batch-tx-amount-1').value = '';
+        document.getElementById('batch-tx-ref-1').value = '';
+        document.getElementById('batch-tx-to-2').value = '';
+        document.getElementById('batch-tx-amount-2').value = '';
+        document.getElementById('batch-tx-ref-2').value = '';
+      } catch (error) {
+        console.error('Batch transactions failed:', error);
+        updateStatus('Batch transactions failed: ' + error.message, 'error');
+      }
+    }
+
+    // Execute batch API calls
+    async function executeBatchApiCalls() {
+      try {
+        const asset1 = document.getElementById('batch-call-asset-1').value.trim();
+        const price1 = parseFloat(document.getElementById('batch-call-price-1').value);
+        
+        const asset2 = document.getElementById('batch-call-asset-2').value.trim();
+        const price2 = parseFloat(document.getElementById('batch-call-price-2').value);
+
+        if (!asset1 || !price1 || !asset2 || !price2) {
+          alert('Please fill in both API calls (asset address and price required)');
+          return;
+        }
+
+        updateStatus('Executing batch API calls...', '');
+        
+        const calls = [
+          {
+            endpoint: 'market/create/bid',
+            params: {
+              address: asset1,
+              price: price1
+            }
+          },
+          {
+            endpoint: 'market/create/bid',
+            params: {
+              address: asset2,
+              price: price2
+            }
+          }
+        ];
+
+        const result = await window.nexus.executeBatchCalls(calls);
+
+        document.getElementById('batch-call-data').textContent = JSON.stringify(result, null, 2);
+        document.getElementById('batch-call-result').style.display = 'block';
+        updateStatus('Batch API calls executed successfully!', 'connected');
+
+        // Clear form
+        document.getElementById('batch-call-asset-1').value = '';
+        document.getElementById('batch-call-price-1').value = '';
+        document.getElementById('batch-call-asset-2').value = '';
+        document.getElementById('batch-call-price-2').value = '';
+      } catch (error) {
+        console.error('Batch API calls failed:', error);
+        updateStatus('Batch API calls failed: ' + error.message, 'error');
+      }
+    }
+
+    // Update status message
+    function updateStatus(message, type) {
+      const statusDiv = document.getElementById('wallet-status');
+      const statusText = document.getElementById('status-text');
+      
+      statusText.textContent = message;
+      statusDiv.className = 'status ' + type;
+    }
+
+    // Check on page load
+    window.addEventListener('load', async () => {
+      await checkWalletInstalled();
+      
+      // Listen for wallet provider initialization
+      window.addEventListener('nexus#initialized', () => {
+        console.log('Nexus provider initialized');
+        checkWalletInstalled();
+      });
+    });
+  </script>
+</body>
+</html>

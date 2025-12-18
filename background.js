@@ -24,6 +24,20 @@ chrome.runtime.onStartup.addListener(async () => {
   await wallet.initialize();
 });
 
+// Ensure wallet is properly initialized
+async function ensureWalletInitialized() {
+  if (!wallet) {
+    console.log('Creating new wallet instance');
+    wallet = new WalletService();
+    await wallet.initialize();
+  } else if (!wallet.session) {
+    // Wallet exists but session might not be loaded - reinitialize to load from storage
+    console.log('Wallet exists but no session - reinitializing');
+    await wallet.initialize();
+  }
+  return wallet;
+}
+
 // Handle messages from popup and content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log('=== Message received in background ===');
@@ -118,10 +132,8 @@ async function handleMessage(request, sender) {
     return { error: 'No method specified' };
   }
 
-  if (!wallet) {
-    wallet = new WalletService();
-    await wallet.initialize();
-  }
+  // Ensure wallet is properly initialized with session data
+  await ensureWalletInitialized();
 
   switch (method) {
     // Wallet management
@@ -138,7 +150,15 @@ async function handleMessage(request, sender) {
       return { result: await wallet.createWallet(params.username, params.password, params.pin) };
     
     case 'wallet.login':
-      return { result: await wallet.login(params.username, params.password, params.pin) };
+      console.log('=== wallet.login received in background ===');
+      console.log('Username:', params.username);
+      console.log('Attempting login...');
+      const loginResult = await wallet.login(params.username, params.password, params.pin);
+      console.log('Login successful!');
+      console.log('Session established:', !!wallet.session);
+      console.log('Username:', wallet.username);
+      console.log('Is locked:', wallet.isLocked);
+      return { result: loginResult };
     
     case 'wallet.logout':
       // Re-initialize wallet to load current session from storage before logging out
@@ -296,10 +316,15 @@ async function handleDAppConnection(sender, params) {
   console.log('Origin:', origin);
   console.log('Sender URL:', senderUrl);
   console.log('Identifier:', identifier);
-  console.log('Wallet exists:', !!wallet);
-  console.log('Wallet isLoggedIn:', wallet ? wallet.isLoggedIn() : 'N/A');
-  console.log('Wallet session:', wallet?.session);
-  console.log('Wallet username:', wallet?.username);
+  console.log('Wallet exists before init:', !!wallet);
+  
+  // Ensure wallet is properly initialized with session data
+  await ensureWalletInitialized();
+  
+  console.log('After ensureWalletInitialized:');
+  console.log('  - Wallet isLoggedIn:', wallet.isLoggedIn());
+  console.log('  - Wallet session:', wallet.session ? '[EXISTS]' : 'null');
+  console.log('  - Wallet username:', wallet.username);
   
   if (!wallet.isLoggedIn()) {
     throw new Error('Wallet not connected. Please log in first.');
@@ -753,12 +778,7 @@ async function handleDAppBatchCalls(params) {
   }
   
   // Calculate DIST service fee based on number of calls
-  let distFee = 1; // 1-4 calls
-  if (calls.length >= 9) {
-    distFee = 3; // 9-12 calls
-  } else if (calls.length >= 5) {
-    distFee = 2; // 5-8 calls
-  }
+  const distFee = 1;
   
   // Request user approval via popup
   console.log('Requesting batch API calls approval...');
@@ -817,17 +837,17 @@ async function handleDAppBatchCalls(params) {
   
   // Charge DIST service fee if any calls succeeded
   if (results.some(r => r.success)) {
-    const DISTORDIA_FEE_ADDRESS = '8Csmb3RP227N1NHJDH8QZRjZjobe4udaygp7aNv5VLPWDvLDVD7';
+    const DISTORDIA_PAYMENT_ADDRESS = ''
     try {
       await wallet.api.debit(
-        'default',
+        DISTORDIA_PAYMENT_ADDRESS,
         distFee,
-        DISTORDIA_FEE_ADDRESS,
+        'DIST',
         approval.pin,
         '',
         wallet.session
       );
-      console.log(`DIST service fee charged: ${distFee} NXS for ${calls.length} API calls`);
+      console.log(`DIST service fee charged: ${distFee} DIST for ${calls.length} API calls`);
     } catch (feeError) {
       console.error('Failed to charge DIST service fee:', feeError);
       // Don't fail the batch if fee payment fails

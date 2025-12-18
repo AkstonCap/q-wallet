@@ -198,11 +198,17 @@
     <div class="section">
       <h3>6. Execute Batch API Calls</h3>
       <p>Execute multiple API calls with a single approval (2x market/create/bid)</p>
-      <input type="text" id="batch-call-asset-1" placeholder="Call 1: Asset address">
+      <input type="text" id="batch-call-market-1" placeholder="Call 1: Market pair (e.g., NXS/USDD)">
+      <input type="text" id="batch-call-from-1" placeholder="Call 1: Payment account">
+      <input type="text" id="batch-call-to-1" placeholder="Call 1: Receival account">
       <input type="number" id="batch-call-price-1" placeholder="Call 1: Price" step="0.01" min="0">
+      <input type="number" id="batch-call-amount-1" placeholder="Call 1: Amount" step="0.01" min="0">
       <br>
-      <input type="text" id="batch-call-asset-2" placeholder="Call 2: Asset address">
+      <input type="text" id="batch-call-market-2" placeholder="Call 2: Market pair (e.g., NXS/USDD)">
+      <input type="text" id="batch-call-from-2" placeholder="Call 2: Payment account">
+      <input type="text" id="batch-call-to-2" placeholder="Call 2: Receival account">
       <input type="number" id="batch-call-price-2" placeholder="Call 2: Price" step="0.01" min="0">
+      <input type="number" id="batch-call-amount-2" placeholder="Call 2: Amount" step="0.01" min="0">
       <button id="batch-call-btn" onclick="executeBatchApiCalls()" disabled>Execute Batch Calls</button>
       
       <div id="batch-call-result" style="display: none;">
@@ -484,14 +490,20 @@ if (typeof window.nexus !== 'undefined') {
     // Execute batch API calls
     async function executeBatchApiCalls() {
       try {
-        const asset1 = document.getElementById('batch-call-asset-1').value.trim();
+        const market1 = document.getElementById('batch-call-market-1').value.trim();
+        const from1 = document.getElementById('batch-call-from-1').value.trim();
+        const to1 = document.getElementById('batch-call-to-1').value.trim();
         const price1 = parseFloat(document.getElementById('batch-call-price-1').value);
+        const amount1 = parseFloat(document.getElementById('batch-call-amount-1').value);
         
-        const asset2 = document.getElementById('batch-call-asset-2').value.trim();
+        const market2 = document.getElementById('batch-call-market-2').value.trim();
+        const from2 = document.getElementById('batch-call-from-2').value.trim();
+        const to2 = document.getElementById('batch-call-to-2').value.trim();
         const price2 = parseFloat(document.getElementById('batch-call-price-2').value);
+        const amount2 = parseFloat(document.getElementById('batch-call-amount-2').value);
 
-        if (!asset1 || !price1 || !asset2 || !price2) {
-          alert('Please fill in both API calls (asset address and price required)');
+        if (!market1 || !from1 || !to1 || !price1 || !amount1 || !market2 || !from2 || !to2 || !price2 || !amount2) {
+          alert('Please fill in all fields for both API calls');
           return;
         }
 
@@ -501,15 +513,21 @@ if (typeof window.nexus !== 'undefined') {
           {
             endpoint: 'market/create/bid',
             params: {
-              address: asset1,
-              price: price1
+              market: market1,
+              from: from1,
+              to: to1,
+              price: price1,
+              amount: amount1
             }
           },
           {
             endpoint: 'market/create/bid',
             params: {
-              address: asset2,
-              price: price2
+              market: market2,
+              from: from2,
+              to: to2,
+              price: price2,
+              amount: amount2
             }
           }
         ];
@@ -521,10 +539,16 @@ if (typeof window.nexus !== 'undefined') {
         updateStatus('Batch API calls executed successfully!', 'connected');
 
         // Clear form
-        document.getElementById('batch-call-asset-1').value = '';
+        document.getElementById('batch-call-market-1').value = '';
+        document.getElementById('batch-call-from-1').value = '';
+        document.getElementById('batch-call-to-1').value = '';
         document.getElementById('batch-call-price-1').value = '';
-        document.getElementById('batch-call-asset-2').value = '';
+        document.getElementById('batch-call-amount-1').value = '';
+        document.getElementById('batch-call-market-2').value = '';
+        document.getElementById('batch-call-from-2').value = '';
+        document.getElementById('batch-call-to-2').value = '';
         document.getElementById('batch-call-price-2').value = '';
+        document.getElementById('batch-call-amount-2').value = '';
       } catch (error) {
         console.error('Batch API calls failed:', error);
         updateStatus('Batch API calls failed: ' + error.message, 'error');

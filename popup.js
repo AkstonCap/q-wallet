@@ -7,40 +7,27 @@ let autoRefreshInterval = null;
 
 // Initialize popup
 document.addEventListener('DOMContentLoaded', async () => {
-  console.log('=== Popup DOMContentLoaded ===');
-  
   // Initialize wallet service
   wallet = new WalletService();
   const isLoggedIn = await wallet.initialize();
-  
-  console.log('Wallet initialized:');
-  console.log('  - isLoggedIn:', wallet.isLoggedIn());
-  console.log('  - isLocked:', wallet.isLocked);
-  console.log('  - session: [REDACTED]');
-  console.log('  - username:', wallet.username);
 
   // Load and set saved API URL
   await loadSavedApiUrl();
 
   // Check if user is logged in
   if (wallet.isLoggedIn()) {
-    console.log('User has active session - showing wallet screen');
-    console.log('  - isLocked:', wallet.isLocked);
     showScreen('wallet');
     
     // Always load wallet data (balance, accounts, etc. are visible even when locked)
     await loadWalletData();
     
     if (wallet.isLocked) {
-      console.log('Session is locked - showing unlock button, disabling transaction actions');
       showLockedState();
     } else {
-      console.log('Session is unlocked - enabling all features');
       hideLockedState(); // Ensure locked state is hidden
       startAutoRefresh();
     }
   } else {
-    console.log('No active session - showing login screen');
     showScreen('login');
     // Show and check node status on login screen initialization
     const statusContainer = document.getElementById('login-node-status');
@@ -234,22 +221,15 @@ async function handleLogin() {
     return;
   }
 
-  console.log('=== handleLogin started ===');
   showLoading('Logging in...');
 
   try {
     // Set the selected API URL before login
     const apiUrl = getLoginApiUrl();
-    console.log('Setting API URL:', apiUrl);
     await wallet.updateNodeUrl(apiUrl);
     
     // Create session and unlock it (login attempts to unlock automatically)
-    console.log('Calling wallet.login()...');
     const loginResult = await wallet.login(username, password, pin);
-    console.log('Login completed:', loginResult);
-    console.log('Wallet state after login:');
-    console.log('  - session: [REDACTED]');
-    console.log('  - isLocked:', wallet.isLocked);
     
     // Move to wallet UI and load data
     showScreen('wallet');
@@ -259,10 +239,8 @@ async function handleLogin() {
     await loadWalletData();
     
     if (wallet.isLocked) {
-      console.log('Session is locked - showing locked state');
       showLockedState();
     } else {
-      console.log('Session is unlocked - starting auto-refresh');
       hideLockedState(); // Ensure locked state is hidden
       startAutoRefresh();
     }
@@ -381,10 +359,8 @@ async function loadWalletData() {
       quantumBadge.style.display = 'flex';
     }
     
-    console.log('Loading accounts...');
     // Get all accounts (each token has its own account with unique address)
     const accounts = await wallet.listAccounts();
-    console.log('Accounts loaded:', accounts);
     
     // Check if accounts is an array
     if (!Array.isArray(accounts)) {

@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
   try {
     callsData = JSON.parse(callsParam);
   } catch (error) {
-    console.error('Failed to parse calls data:', error);
+    console.error('[Nexus] Failed to parse calls data:', error.message);
     showError('Invalid batch calls data');
     return;
   }
@@ -37,10 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Listen for result from background
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    console.log('Message received:', message);
-    
     if (message.type === 'BATCH_CALLS_RESULT' && message.requestId === requestId) {
-      console.log('Batch calls result received:', message);
       hideLoading();
       
       if (message.success) {
@@ -134,7 +131,7 @@ async function loadDistAccounts() {
     
     approveBtn.disabled = false;
   } catch (error) {
-    console.error('Failed to load DIST accounts:', error);
+    console.error('[Nexus] Failed to load DIST accounts:', error.message);
     select.innerHTML = '<option value="">Error loading accounts</option>';
     approveBtn.disabled = true;
   }
@@ -174,8 +171,6 @@ async function handleApprove() {
     return;
   }
   
-  console.log('Sending approval response with requestId:', requestId);
-  
   // Show loading
   showLoading();
   
@@ -191,14 +186,11 @@ async function handleApprove() {
       calls: callsData,
       distFee: distFee
     }
-  }, (response) => {
-    console.log('Approval sent, response:', response);
   });
 }
 
 // Handle deny button
 function handleDeny() {
-  console.log('User denied batch calls');
   
   chrome.runtime.sendMessage({
     type: 'TRANSACTION_APPROVAL_RESPONSE',

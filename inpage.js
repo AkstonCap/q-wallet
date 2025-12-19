@@ -4,9 +4,43 @@
 (function() {
   'use strict';
 
+  // Simple logger for inpage script
+  const Logger = {
+    DEBUG: true, // Set to false in production
+    SENSITIVE_FIELDS: ['pin', 'password', 'session', 'privatekey', 'private_key', 'mnemonic', 'seed', 'genesis', 'username'],
+    
+    redact(value) {
+      if (value === null || value === undefined) return value;
+      if (typeof value === 'string' && value.length > 32 && /^[a-f0-9]+$/i.test(value)) return '[REDACTED]';
+      if (Array.isArray(value)) return value.map(item => this.redact(item));
+      if (typeof value === 'object') {
+        const redacted = {};
+        for (const [key, val] of Object.entries(value)) {
+          redacted[key] = this.SENSITIVE_FIELDS.some(f => key.toLowerCase().includes(f)) ? '[REDACTED]' : this.redact(val);
+        }
+        return redacted;
+      }
+      return value;
+    },
+    
+    _processArgs(...args) {
+      return args.map(arg => this.redact(arg));
+    },
+    
+    debug(...args) {
+      if (this.DEBUG) console.debug('[Nexus Provider]', ...this._processArgs(...args));
+    },
+    info(...args) {
+      console.info('[Nexus Provider]', ...this._processArgs(...args));
+    },
+    error(...args) {
+      console.error('[Nexus Provider]', ...this._processArgs(...args));
+    }
+  };
+
   // Guard against multiple injections
   if (window.__NEXUS_WALLET_PROVIDER_INJECTED__) {
-    console.log('Nexus Provider already injected, skipping');
+    Logger.debug('Provider already injected, skipping');
     return;
   }
   window.__NEXUS_WALLET_PROVIDER_INJECTED__ = true;
@@ -80,7 +114,7 @@
         
         return result.accounts;
       } catch (error) {
-        console.error('Failed to connect to Nexus wallet:', error);
+        Logger.error('Failed to connect:', error.message);
         throw error;
       }
     }
@@ -118,7 +152,7 @@
         
         return result;
       } catch (error) {
-        console.error('Failed to disconnect from Nexus wallet:', error);
+        Logger.error('Failed to disconnect:', error.message);
         throw error;
       }
     }
@@ -132,7 +166,7 @@
         });
         return result;
       } catch (error) {
-        console.error('Failed to get all balances:', error);
+        Logger.error('Failed to get all balances:', error.message);
         throw error;
       }
     }
@@ -158,7 +192,7 @@
           params
         });
       } catch (error) {
-        console.error('Failed to send transaction:', error);
+        Logger.error('Failed to send transaction:', error.message);
         throw error;
       }
     }
@@ -171,7 +205,7 @@
           params: { transactions }
         });
       } catch (error) {
-        console.error('Failed to send batch transactions:', error);
+        Logger.error('Failed to send batch transactions:', error.message);
         throw error;
       }
     }
@@ -185,7 +219,7 @@
           params: { calls }
         });
       } catch (error) {
-        console.error('Failed to execute batch calls:', error);
+        Logger.error('Failed to execute batch calls:', error.message);
         throw error;
       }
     }
@@ -198,7 +232,7 @@
           params: { transaction }
         });
       } catch (error) {
-        console.error('Failed to sign transaction:', error);
+        Logger.error('Failed to sign transaction:', error.message);
         throw error;
       }
     }
@@ -211,7 +245,7 @@
           params: { account }
         });
       } catch (error) {
-        console.error('Failed to get balance:', error);
+        Logger.error('Failed to get accounts:', error.message);
         throw error;
       }
     }
@@ -224,7 +258,7 @@
           params: { limit }
         });
       } catch (error) {
-        console.error('Failed to get transaction history:', error);
+        Logger.error('Failed to get transaction history:', error.message);
         throw error;
       }
     }
@@ -242,12 +276,12 @@
     // Event emitter (for future implementation)
     on(eventName, callback) {
       // Placeholder for event handling
-      console.log(`Event listener registered for: ${eventName}`);
+      Logger.debug('Event listener registered:', eventName);
     }
 
     removeListener(eventName, callback) {
       // Placeholder for event handling
-      console.log(`Event listener removed for: ${eventName}`);
+      Logger.debug('Event listener removed:', eventName);
     }
   }
 
@@ -270,6 +304,6 @@
   // Announce provider availability
   window.dispatchEvent(new Event('nexus#initialized'));
 
-  console.log('Nexus Provider injected successfully');
-  console.log('Access via window.nexus or window.nexusWallet');
+  Logger.info('Provider injected successfully');
+  Logger.debug('Access via window.nexus or window.nexusWallet');
 })();

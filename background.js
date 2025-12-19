@@ -2,7 +2,7 @@
 // Handles background processes, message passing, and dApp connections
 
 // Import services
-importScripts('services/nexus-api.js', 'services/storage.js', 'services/wallet.js');
+importScripts('lib/logger.js', 'services/nexus-api.js', 'services/storage.js', 'services/wallet.js');
 
 let wallet;
 const pendingApprovals = new Map(); // Store pending connection approval requests
@@ -12,14 +12,14 @@ const recentConnectionRequests = new Map(); // Track recent connection requests 
 
 // Initialize on install
 chrome.runtime.onInstalled.addListener(async () => {
-  console.log('Nexus Wallet extension installed');
+  Logger.info('Extension installed');
   wallet = new WalletService();
   await wallet.initialize();
 });
 
 // Initialize on startup
 chrome.runtime.onStartup.addListener(async () => {
-  console.log('Nexus Wallet extension started');
+  Logger.info('Extension started');
   wallet = new WalletService();
   await wallet.initialize();
 });
@@ -27,12 +27,12 @@ chrome.runtime.onStartup.addListener(async () => {
 // Ensure wallet is properly initialized
 async function ensureWalletInitialized() {
   if (!wallet) {
-    console.log('Creating new wallet instance');
+    Logger.debug('Creating new wallet instance');
     wallet = new WalletService();
     await wallet.initialize();
   } else if (!wallet.session) {
     // Wallet exists but session might not be loaded - reinitialize to load from storage
-    console.log('Wallet exists but no session - reinitializing');
+    Logger.debug('Wallet reinitializing to load session');
     await wallet.initialize();
   }
   return wallet;
@@ -40,17 +40,12 @@ async function ensureWalletInitialized() {
 
 // Handle messages from popup and content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log('=== Message received in background ===');
-  console.log('Message type:', request.type);
-  console.log('Message method:', request.method);
-  console.log('Sender tab:', sender.tab?.id);
-  console.log('Sender URL:', sender.url);
-  console.log('Full request:', request);
+  Logger.debug('Message received:', request.method || request.type, 'from', sender.url);
   
   // Handle connection approval responses
   if (request.type === 'CONNECTION_RESPONSE') {
     const { requestId, approved, blocked, origin } = request;
-    console.log('Connection response received:', { requestId, approved, blocked, origin });
+    Logger.debug('Connection response:', approved ? 'approved' : 'denied', origin);
     
     const pending = pendingApprovals.get(requestId);
     if (pending) {
@@ -58,7 +53,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       if (blocked) {
         const storage = new StorageService();
         storage.addBlockedDomain(origin).then(() => {
-          console.log('Domain blocked:', origin);
+          Logger.info('Domain blocked:', origin);
         });
       }
       
@@ -79,18 +74,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Handle transaction approval responses
   if (request.type === 'TRANSACTION_APPROVAL_RESPONSE') {
     const { requestId, approved, pin, distAccount, transactionData } = request;
-    console.log('=== TRANSACTION_APPROVAL_RESPONSE received ===');
-    console.log('RequestId:', requestId);
-    console.log('Approved:', approved);
-    console.log('Has PIN:', !!pin);
-    console.log('DIST Account:', distAccount);
-    console.log('TransactionData:', transactionData);
-    console.log('Pending approvals map size:', pendingTransactionApprovals.size);
-    console.log('Pending approvals has this requestId:', pendingTransactionApprovals.has(requestId));
+    Logger.debug('Transaction approval:', approved ? 'approved' : 'denied');
     
     const pending = pendingTransactionApprovals.get(requestId);
     if (pending) {
-      console.log('Found pending approval, resolving...');
       // Resolve the promise with approval status, PIN, distAccount, and window info
       pending.resolve({ 
         approved, 
@@ -101,11 +88,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         windowId: pending.windowId
       });
       pendingTransactionApprovals.delete(requestId);
-      console.log('Pending approval resolved and deleted');
       
       // Don't close the window yet - wait for transaction result to be displayed
     } else {
-      console.error('No pending approval found for requestId:', requestId);
+      Logger.error('No pending approval found for requestId:', requestId);
     }
     
     sendResponse({ success: true });
@@ -116,7 +102,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   handleMessage(request, sender)
     .then(sendResponse)
     .catch(error => {
-      console.error('Message handler error:', error);
+      Logger.error('Message handler error:', error.message);
       sendResponse({ error: error.message });
     });
   
@@ -130,7 +116,7 @@ async function handleMessage(request, sender) {
   
   // Guard against messages without method (e.g., internal extension messages)
   if (!method) {
-    console.warn('Message received without method property:', request);
+    Logger.warn('Message received without method property');
     return { error: 'No method specified' };
   }
 
@@ -152,14 +138,9 @@ async function handleMessage(request, sender) {
       return { result: await wallet.createWallet(params.username, params.password, params.pin) };
     
     case 'wallet.login':
-      console.log('=== wallet.login received in background ===');
-      console.log('Username:', params.username);
-      console.log('Attempting login...');
+      Logger.debug('Login attempt');
       const loginResult = await wallet.login(params.username, params.password, params.pin);
-      console.log('Login successful!');
-      console.log('Session established:', !!wallet.session);
-      console.log('Username:', wallet.username);
-      console.log('Is locked:', wallet.isLocked);
+      Logger.info('Login successful');
       return { result: loginResult };
     
     case 'wallet.logout':
@@ -221,9 +202,7 @@ async function handleMessage(request, sender) {
       return await handleSignTransaction(params);
     
     case 'dapp.sendTransaction':
-      console.log('=== dapp.sendTransaction case triggered ===');
-      console.log('Sender:', sender);
-      console.log('Params:', params);
+      Logger.debug('dApp transaction request from:', params.origin);
       await checkDAppPermission(params.origin, sender.url);
       if (!wallet.isLoggedIn()) {
         throw new Error('Wallet not connected');
@@ -232,9 +211,7 @@ async function handleMessage(request, sender) {
       return await handleDAppTransaction(params);
     
     case 'dapp.sendBatchTransactions':
-      console.log('=== dapp.sendBatchTransactions case triggered ===');
-      console.log('Sender:', sender);
-      console.log('Params:', params);
+      Logger.debug('dApp batch transactions from:', params.origin);
       await checkDAppPermission(params.origin, sender.url);
       if (!wallet.isLoggedIn()) {
         throw new Error('Wallet not connected');
@@ -243,9 +220,7 @@ async function handleMessage(request, sender) {
       return await handleDAppBatchTransaction(params);
 
     case 'dapp.executeBatchCalls':
-      console.log('=== dapp.executeBatchCalls case triggered ===');
-      console.log('Sender:', sender);
-      console.log('Params:', params);
+      Logger.debug('dApp batch API calls from:', params.origin);
       await checkDAppPermission(params.origin, sender.url);
       if (!wallet.isLoggedIn()) {
         throw new Error('Wallet not connected');
@@ -254,14 +229,11 @@ async function handleMessage(request, sender) {
       return await handleDAppBatchCalls(params);
 
     case 'dapp.disconnect':
-      console.log('=== dapp.disconnect case triggered ===');
-      console.log('Sender:', sender);
-      console.log('Origin:', params.origin);
+      Logger.debug('dApp disconnect:', params.origin);
       // Allow site to disconnect itself without approval
       return await handleDAppDisconnect(params.origin, sender.url);
 
     case 'dapp.getAllBalances':
-      console.log('=== dapp.getAllBalances case triggered ===');
       await checkDAppPermission(params.origin, sender.url);
       if (!wallet.isLoggedIn()) {
         throw new Error('Wallet not connected');
@@ -325,19 +297,10 @@ async function handleDAppConnection(sender, params) {
   const senderUrl = sender.url || origin;
   const identifier = senderUrl.startsWith('file://') ? senderUrl : origin;
   
-  console.log('=== handleDAppConnection called ===');
-  console.log('Origin:', origin);
-  console.log('Sender URL:', senderUrl);
-  console.log('Identifier:', identifier);
-  console.log('Wallet exists before init:', !!wallet);
+  Logger.debug('dApp connection request:', identifier);
   
   // Ensure wallet is properly initialized with session data
   await ensureWalletInitialized();
-  
-  console.log('After ensureWalletInitialized:');
-  console.log('  - Wallet isLoggedIn:', wallet.isLoggedIn());
-  console.log('  - Wallet session:', wallet.session ? '[EXISTS]' : 'null');
-  console.log('  - Wallet username:', wallet.username);
   
   if (!wallet.isLoggedIn()) {
     throw new Error('Wallet not connected. Please log in first.');
@@ -370,7 +333,7 @@ async function handleDAppConnection(sender, params) {
   const pendingKey = `connection:${identifier}`;
   const existingPending = recentConnectionRequests.get(pendingKey);
   if (existingPending) {
-    console.log('Connection request already pending for:', identifier, 'waiting for result...');
+    Logger.debug('Connection request already pending:', identifier);
     // Wait for the existing request to complete instead of throwing error
     return existingPending;
   }
@@ -412,7 +375,7 @@ async function handleDAppConnection(sender, params) {
 async function requestUserApproval(origin) {
   return new Promise((resolve, reject) => {
     const requestId = Date.now().toString();
-    console.log('Requesting approval for:', origin, 'requestId:', requestId);
+    Logger.debug('Requesting dApp approval:', origin);
     
     // Store the pending request
     pendingApprovals.set(requestId, { origin, resolve, reject });
@@ -429,13 +392,13 @@ async function requestUserApproval(origin) {
       focused: true
     }, (window) => {
       if (chrome.runtime.lastError) {
-        console.error('Failed to create approval window:', chrome.runtime.lastError);
+        Logger.error('Failed to create approval window:', chrome.runtime.lastError.message);
         pendingApprovals.delete(requestId);
         reject(new Error('Unable to show approval dialog'));
         return;
       }
       
-      console.log('Approval window created:', window.id);
+      Logger.debug('Approval window created for:', origin);
       
       // Store window ID with the request
       const pending = pendingApprovals.get(requestId);
@@ -446,7 +409,7 @@ async function requestUserApproval(origin) {
       // Add timeout - auto-deny after 2 minutes
       setTimeout(() => {
         if (pendingApprovals.has(requestId)) {
-          console.log('Approval request timed out for:', origin);
+          Logger.warn('Approval request timed out:', origin);
           pendingApprovals.delete(requestId);
           reject(new Error('Connection request timed out'));
           
@@ -510,7 +473,7 @@ async function handleDAppTransaction(params) {
   if (recentTransactionRequests.has(requestKey)) {
     const lastTime = recentTransactionRequests.get(requestKey);
     if (now - lastTime < 500) {
-      console.warn('Duplicate transaction request detected and ignored:', requestKey);
+      Logger.warn('Duplicate transaction request ignored');
       throw new Error('Duplicate request detected');
     }
   }
@@ -526,7 +489,7 @@ async function handleDAppTransaction(params) {
   }, 1000);
   
   // Request user approval via popup
-  console.log('Requesting transaction approval...');
+  Logger.debug('Requesting transaction approval');
   const approval = await requestTransactionApproval({
     origin,
     from: fromAccount,
@@ -535,26 +498,14 @@ async function handleDAppTransaction(params) {
     reference: validatedReference
   });
   
-  console.log('=== Approval received ===');
-  console.log('Approval:', approval);
-  
   if (!approval.approved) {
-    console.log('Transaction was rejected by user');
     throw new Error('Transaction rejected by user');
   }
   
   if (!approval.pin) {
-    console.log('ERROR: No PIN in approval');
+    Logger.error('No PIN provided in approval');
     throw new Error('PIN is required for transaction');
   }
-  
-  console.log('=== Executing transaction ===');
-  console.log('From:', approval.transactionData.from);
-  console.log('Amount:', approval.transactionData.amount);
-  console.log('To:', approval.transactionData.to);
-  console.log('Reference:', approval.transactionData.reference);
-  console.log('Wallet session:', wallet.session);
-  console.log('Wallet isLocked:', wallet.isLocked);
   
   // Verify wallet state
   if (!wallet.session) {
@@ -566,7 +517,6 @@ async function handleDAppTransaction(params) {
   let error;
   
   try {
-    console.log('Calling wallet.send()...');
     result = await wallet.send(
       approval.transactionData.from,
       approval.transactionData.amount,
@@ -574,13 +524,9 @@ async function handleDAppTransaction(params) {
       approval.pin,
       approval.transactionData.reference || undefined
     );
-    console.log('=== Transaction successful ===');
-    console.log('Result:', result);
+    Logger.info('Transaction successful:', result.txid || result);
   } catch (err) {
-    console.error('=== Transaction failed ===');
-    console.error('Error:', err);
-    console.error('Error message:', err.message);
-    console.error('Error stack:', err.stack);
+    Logger.error('Transaction failed:', err.message);
     error = err.message;
   }
   
@@ -594,7 +540,7 @@ async function handleDAppTransaction(params) {
       result: result,
       error: error
     }).catch((err) => {
-      console.log('Could not broadcast result:', err.message);
+      Logger.debug('Could not broadcast result:', err.message);
     });
     
     // Give popup time to receive and display the result before potential window close
@@ -612,10 +558,7 @@ async function handleDAppTransaction(params) {
 async function handleDAppBatchTransaction(params) {
   const { origin, transactions } = params;
   
-  console.log('=== handleDAppBatchTransaction called ===');
-  console.log('Origin:', origin);
-  console.log('Number of transactions:', transactions?.length);
-  console.log('Transactions:', transactions);
+  Logger.debug('Batch transaction request:', transactions?.length, 'transactions');
   
   // Validate input
   if (!Array.isArray(transactions) || transactions.length === 0) {
@@ -672,22 +615,18 @@ async function handleDAppBatchTransaction(params) {
   }
   
   // Request user approval via popup
-  console.log('Requesting batch transaction approval...');
+  Logger.debug('Requesting batch transaction approval');
   const approval = await requestBatchTransactionApproval({
     origin,
     transactions
   });
   
-  console.log('=== Batch approval received ===');
-  console.log('Approval:', approval);
-  
   if (!approval.approved) {
-    console.log('Batch transaction was rejected by user');
     throw new Error('Batch transaction rejected by user');
   }
   
   if (!approval.pin) {
-    console.log('ERROR: No PIN in approval');
+    Logger.error('No PIN provided in batch approval');
     throw new Error('PIN is required for transactions');
   }
   
@@ -697,13 +636,12 @@ async function handleDAppBatchTransaction(params) {
   }
   
   // Execute all transactions
-  console.log('=== Executing batch transactions ===');
+  Logger.debug('Executing', transactions.length, 'transactions');
   const results = [];
   const errors = [];
   
   for (let i = 0; i < transactions.length; i++) {
     const tx = transactions[i];
-    console.log(`Executing transaction ${i + 1}/${transactions.length}:`, tx);
     
     try {
       const result = await wallet.send(
@@ -713,10 +651,10 @@ async function handleDAppBatchTransaction(params) {
         approval.pin,
         tx.reference || undefined
       );
-      console.log(`Transaction ${i + 1} successful:`, result);
+      Logger.debug(`Transaction ${i + 1}/${transactions.length} successful`);
       results.push({ success: true, result, index: i });
     } catch (err) {
-      console.error(`Transaction ${i + 1} failed:`, err.message);
+      Logger.error(`Transaction ${i + 1}/${transactions.length} failed:`, err.message);
       errors.push({ success: false, error: err.message, index: i });
       
       // Optionally stop on first error
@@ -728,11 +666,7 @@ async function handleDAppBatchTransaction(params) {
   
   // Send result back to popup window
   if (approval.requestId) {
-    console.log('Broadcasting batch transaction results:', { 
-      requestId: approval.requestId, 
-      totalSuccessful: results.filter(r => r.success).length,
-      totalFailed: errors.length
-    });
+    Logger.debug('Broadcasting batch results:', results.filter(r => r.success).length, '/', transactions.length, 'successful');
     chrome.runtime.sendMessage({
       type: 'BATCH_TRANSACTION_RESULT',
       requestId: approval.requestId,
@@ -741,7 +675,7 @@ async function handleDAppBatchTransaction(params) {
       totalTransactions: transactions.length,
       successfulTransactions: results.filter(r => r.success).length
     }).catch((err) => {
-      console.log('Could not broadcast batch results:', err.message);
+      Logger.debug('Could not broadcast batch results:', err.message);
     });
     
     // Give popup time to receive and display the result
@@ -765,10 +699,7 @@ async function handleDAppBatchTransaction(params) {
 async function handleDAppBatchCalls(params) {
   const { origin, calls } = params;
   
-  console.log('=== handleDAppBatchCalls called ===');
-  console.log('Origin:', origin);
-  console.log('Number of calls:', calls?.length);
-  console.log('Calls:', calls);
+  Logger.debug('Batch API calls request:', calls?.length, 'calls');
   
   // Validate input
   if (!Array.isArray(calls) || calls.length === 0) {
@@ -794,28 +725,24 @@ async function handleDAppBatchCalls(params) {
   const distFee = 1;
   
   // Request user approval via popup
-  console.log('Requesting batch API calls approval...');
+  Logger.debug('Requesting batch API calls approval');
   const approval = await requestBatchCallsApproval({
     origin,
     calls,
     distFee
   });
   
-  console.log('=== Batch calls approval received ===');
-  console.log('Approval:', approval);
-  
   if (!approval.approved) {
-    console.log('Batch calls rejected by user');
     throw new Error('Batch API calls rejected by user');
   }
   
   if (!approval.pin) {
-    console.log('ERROR: No PIN in approval');
+    Logger.error('No PIN provided in batch calls approval');
     throw new Error('PIN is required for API calls');
   }
   
   if (!approval.distAccount) {
-    console.log('ERROR: No DIST account selected');
+    Logger.error('No DIST account selected');
     throw new Error('DIST account selection is required for fee payment');
   }
   
@@ -825,13 +752,12 @@ async function handleDAppBatchCalls(params) {
   }
   
   // Execute all API calls
-  console.log('=== Executing batch API calls ===');
+  Logger.debug('Executing', calls.length, 'API calls');
   const results = [];
   const errors = [];
   
   for (let i = 0; i < calls.length; i++) {
     const call = calls[i];
-    console.log(`Executing call ${i + 1}/${calls.length}: ${call.endpoint}`, call.params);
     
     try {
       // Add session and pin to params
@@ -843,10 +769,10 @@ async function handleDAppBatchCalls(params) {
       
       // Execute the API call
       const result = await wallet.api.request(call.endpoint, callParams);
-      console.log(`Call ${i + 1} successful:`, result);
+      Logger.debug(`Call ${i + 1}/${calls.length} successful:`, call.endpoint);
       results.push({ success: true, result, index: i, endpoint: call.endpoint });
     } catch (err) {
-      console.error(`Call ${i + 1} failed:`, err.message);
+      Logger.error(`Call ${i + 1}/${calls.length} failed:`, call.endpoint, err.message);
       errors.push({ success: false, error: err.message, index: i, endpoint: call.endpoint });
       results.push({ success: false, error: err.message, index: i, endpoint: call.endpoint });
       break; // Stop on first error
@@ -865,20 +791,16 @@ async function handleDAppBatchCalls(params) {
         pin: approval.pin,
         session: wallet.session
       });
-      console.log(`DIST service fee charged: ${distFee} DIST from account ${approval.distAccount}`);
+      Logger.info('DIST fee charged:', distFee, 'DIST');
     } catch (feeError) {
-      console.error('Failed to charge DIST service fee:', feeError);
+      Logger.error('Failed to charge DIST fee:', feeError.message);
       // Don't fail the batch if fee payment fails
     }
   }
   
   // Send result back to popup window
   if (approval.requestId) {
-    console.log('Broadcasting batch calls results:', { 
-      requestId: approval.requestId, 
-      totalSuccessful: results.filter(r => r.success).length,
-      totalFailed: errors.length
-    });
+    Logger.debug('Broadcasting batch calls results:', results.filter(r => r.success).length, '/', calls.length, 'successful');
     chrome.runtime.sendMessage({
       type: 'BATCH_CALLS_RESULT',
       requestId: approval.requestId,
@@ -887,7 +809,7 @@ async function handleDAppBatchCalls(params) {
       totalCalls: calls.length,
       successfulCalls: results.filter(r => r.success).length
     }).catch((err) => {
-      console.log('Could not broadcast batch calls results:', err.message);
+      Logger.debug('Could not broadcast batch calls results:', err.message);
     });
     
     // Give popup time to receive and display the result
@@ -941,13 +863,13 @@ async function requestBatchTransactionApproval(batchData) {
       focused: true
     }, (window) => {
       if (chrome.runtime.lastError) {
-        console.error('Failed to create batch approval window:', chrome.runtime.lastError);
+        Logger.error('Failed to create batch approval window:', chrome.runtime.lastError.message);
         pendingTransactionApprovals.delete(requestId);
         reject(new Error('Unable to show batch approval dialog'));
         return;
       }
       
-      console.log('Batch transaction approval window created:', window.id);
+      Logger.debug('Batch transaction approval window created');
       
       // Store window ID with the request
       const pending = pendingTransactionApprovals.get(requestId);
@@ -958,7 +880,7 @@ async function requestBatchTransactionApproval(batchData) {
       // Add timeout - auto-deny after 3 minutes
       setTimeout(() => {
         if (pendingTransactionApprovals.has(requestId)) {
-          console.warn('Batch transaction approval timed out');
+          Logger.warn('Batch transaction approval timed out');
           pendingTransactionApprovals.delete(requestId);
           reject(new Error('Batch approval request timed out'));
           
@@ -974,7 +896,7 @@ async function requestBatchTransactionApproval(batchData) {
 async function requestBatchCallsApproval(batchData) {
   return new Promise((resolve, reject) => {
     const requestId = Date.now().toString();
-    console.log('Requesting batch API calls approval:', batchData, 'requestId:', requestId);
+    Logger.debug('Requesting batch API calls approval');
     
     // Store the pending request
     pendingTransactionApprovals.set(requestId, { 
@@ -1004,13 +926,13 @@ async function requestBatchCallsApproval(batchData) {
       focused: true
     }, (window) => {
       if (chrome.runtime.lastError) {
-        console.error('Failed to create batch calls approval window:', chrome.runtime.lastError);
+        Logger.error('Failed to create batch calls approval window:', chrome.runtime.lastError.message);
         pendingTransactionApprovals.delete(requestId);
         reject(new Error('Unable to show batch calls approval dialog'));
         return;
       }
       
-      console.log('Batch calls approval window created:', window.id);
+      Logger.debug('Batch calls approval window created');
       
       // Store window ID with the request
       const pending = pendingTransactionApprovals.get(requestId);
@@ -1021,7 +943,7 @@ async function requestBatchCallsApproval(batchData) {
       // Add timeout - auto-deny after 3 minutes
       setTimeout(() => {
         if (pendingTransactionApprovals.has(requestId)) {
-          console.warn('Batch calls approval timed out');
+          Logger.warn('Batch calls approval timed out');
           pendingTransactionApprovals.delete(requestId);
           reject(new Error('Batch calls approval request timed out'));
           
@@ -1037,11 +959,11 @@ async function requestBatchCallsApproval(batchData) {
 async function requestTransactionApproval(transactionData) {
   return new Promise((resolve, reject) => {
     const requestId = Date.now().toString();
-    console.log('Requesting transaction approval:', transactionData, 'requestId:', requestId);
+    Logger.debug('Requesting transaction approval');
     
     // Check if there's already a pending request (prevent duplicates)
     if (pendingTransactionApprovals.has(requestId)) {
-      console.warn('Duplicate transaction approval request ignored:', requestId);
+      Logger.warn('Duplicate transaction approval request ignored');
       return pendingTransactionApprovals.get(requestId);
     }
     
@@ -1096,7 +1018,7 @@ async function requestTransactionApproval(transactionData) {
       // Add timeout - auto-deny after 3 minutes
       setTimeout(() => {
         if (pendingTransactionApprovals.has(requestId)) {
-          console.log('Transaction approval request timed out');
+          Logger.warn('Transaction approval timed out');
           pendingTransactionApprovals.delete(requestId);
           reject(new Error('Transaction approval request timed out'));
           
@@ -1131,7 +1053,7 @@ async function handleSignTransaction(params) {
 
 // Handle external connections (for advanced dApp integration)
 chrome.runtime.onConnect.addListener((port) => {
-  console.log('External connection established:', port.name);
+  Logger.debug('External connection established:', port.name);
   
   port.onMessage.addListener(async (msg) => {
     try {
@@ -1150,7 +1072,7 @@ setInterval(async () => {
       await wallet.getBalance('default');
       await wallet.getTransactions('default', 50);
     } catch (error) {
-      console.error('Failed to refresh wallet data:', error);
+      Logger.error('Failed to refresh wallet data:', error.message);
     }
   }
 }, 50 * 1000);
@@ -1158,21 +1080,21 @@ setInterval(async () => {
 // Security: Terminate session when service worker is about to be terminated
 // This happens when the browser closes or the extension is reloaded
 self.addEventListener('beforeunload', async () => {
-  console.log('Service worker terminating, cleaning up session');
+  Logger.info('Service worker terminating, cleaning up session');
   await cleanupSession('service worker termination');
 });
 
 // Also handle extension being disabled/uninstalled
 chrome.management.onDisabled.addListener(async (info) => {
   if (info.id === chrome.runtime.id) {
-    console.log('Extension disabled, terminating session');
+    Logger.info('Extension disabled, terminating session');
     await cleanupSession('extension disabled');
   }
 });
 
 // Handle service worker lifecycle - cleanup on suspend
 chrome.runtime.onSuspend.addListener(async () => {
-  console.log('Service worker suspending, cleaning up session');
+  Logger.info('Service worker suspending, cleaning up session');
   await cleanupSession('service worker suspend');
 });
 
@@ -1188,12 +1110,12 @@ setInterval(async () => {
         const storedSession = await storage.getSession();
         
         if (!storedSession || storedSession.session !== sessionInfo.session) {
-          console.warn('Session mismatch detected, cleaning up');
+          Logger.warn('Session mismatch detected, cleaning up');
           await cleanupSession('session validation failure');
         }
       }
     } catch (error) {
-      console.error('Session validation error:', error);
+      Logger.error('Session validation error:', error.message);
     }
   }
 }, 30000);
@@ -1204,14 +1126,14 @@ chrome.windows.onRemoved.addListener(async (windowId) => {
   const windows = await chrome.windows.getAll();
   if (windows.length === 0) {
     // Last window closed, clean up session
-    console.log('Last browser window closed, terminating session');
+    Logger.info('Last browser window closed, terminating session');
     await cleanupSession('browser close');
   }
 });
 
 // Centralized session cleanup function (defense in depth)
 async function cleanupSession(reason = 'unknown') {
-  console.log(`Cleaning up session (reason: ${reason})`);
+  Logger.info('Cleaning up session:', reason);
   
   try {
     const storage = new StorageService();
@@ -1220,14 +1142,14 @@ async function cleanupSession(reason = 'unknown') {
     try {
       const approvedDomains = await storage.getApprovedDomains();
       if (approvedDomains && approvedDomains.length > 0) {
-        console.log(`Revoking ${approvedDomains.length} dApp connection(s) on ${reason}...`);
+        Logger.debug(`Revoking ${approvedDomains.length} dApp connection(s)`);
         for (const domain of approvedDomains) {
           await storage.removeApprovedDomain(domain);
         }
-        console.log('All dApp connections revoked');
+        Logger.debug('All dApp connections revoked');
       }
     } catch (error) {
-      console.error('Failed to revoke dApp connections:', error);
+      Logger.error('Failed to revoke dApp connections:', error.message);
       // Continue with other cleanup steps
     }
     
@@ -1239,50 +1161,34 @@ async function cleanupSession(reason = 'unknown') {
       try {
         const sessionData = await storage.getSession();
         sessionToTerminate = sessionData?.session;
-        console.log('Session loaded from storage for termination:', {
-          hasSessionData: !!sessionData,
-          hasSession: !!sessionToTerminate
-        });
+        Logger.debug('Session loaded from storage for termination');
       } catch (error) {
-        console.log('Could not load session from storage:', error.message);
+        Logger.debug('Could not load session from storage:', error.message);
       }
     }
-    
-    console.log('Checking wallet state for session termination:', {
-      walletExists: !!wallet,
-      hasSession: !!sessionToTerminate,
-      sessionValue: sessionToTerminate ? '[PRESENT]' : '[NULL]'
-    });
     
     if (sessionToTerminate) {
       try {
         // Get PIN from session storage for authentication
         const pin = await storage.getPin();
         if (!pin) {
-          console.log('No PIN available for session termination - session likely already terminated via logout');
+          Logger.debug('No PIN available for session termination');
         } else {
           const nodeUrl = await storage.getNodeUrl();
           const api = new NexusAPI(nodeUrl);
-          console.log('Attempting to terminate Nexus session with PIN authentication...');
-          // Terminate session with PIN for multi-user nodes
           const response = await api.request('sessions/terminate/local', { 
             pin: pin,
             session: sessionToTerminate 
           });
-          console.log(`Session termination API response:`, response);
-          console.log(`Nexus session terminated on ${reason}`);
+          Logger.info('Nexus session terminated:', reason);
         }
       } catch (error) {
-        // SECURITY: Log error but continue with cleanup
-        // Local storage must be cleared even if blockchain termination fails
-        // This is critical for public computers and offline node scenarios
-        console.error('Failed to terminate Nexus session:', error);
-        console.warn('Local storage will be cleared anyway for security');
-        console.warn('Blockchain session may remain active until it expires naturally');
+        Logger.error('Failed to terminate Nexus session:', error.message);
+        Logger.warn('Local storage will be cleared anyway for security');
         // Continue with storage cleanup below
       }
     } else {
-      console.log('Skipping session termination: no active session found');
+      Logger.debug('Skipping session termination: no active session');
     }
     
     // Step 3: SECURITY - Always clear session from local storage
@@ -1302,9 +1208,9 @@ async function cleanupSession(reason = 'unknown') {
       wallet.isLocked = true;
     }
     
-    console.log(`Session cleanup completed (${reason})`);
+    Logger.info('Session cleanup completed:', reason);
   } catch (error) {
-    console.error(`Session cleanup error (${reason}):`, error);
+    Logger.error('Session cleanup error:', reason, error.message);
   }
 }
 
@@ -1315,11 +1221,11 @@ setInterval(async () => {
     const inactiveDomains = await storage.cleanupInactiveDomains(30 * 60 * 1000); // 30 minutes
     
     if (inactiveDomains.length > 0) {
-      console.log('Disconnected inactive dApps:', inactiveDomains);
+      Logger.debug('Disconnected inactive dApps:', inactiveDomains.length);
     }
   } catch (error) {
-    console.error('Failed to cleanup inactive dApps:', error);
+    Logger.error('Failed to cleanup inactive dApps:', error.message);
   }
 }, 5 * 60 * 1000); // Check every 5 minutes
 
-console.log('Nexus Wallet background service worker loaded');
+Logger.info('Background service worker loaded');

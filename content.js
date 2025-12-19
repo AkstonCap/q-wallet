@@ -4,9 +4,43 @@
 (function() {
   'use strict';
 
+  // Simple logger for content script (can't import external scripts)
+  const Logger = {
+    DEBUG: true, // Set to false in production
+    SENSITIVE_FIELDS: ['pin', 'password', 'session', 'privatekey', 'private_key', 'mnemonic', 'seed', 'genesis', 'username'],
+    
+    redact(value) {
+      if (value === null || value === undefined) return value;
+      if (typeof value === 'string' && value.length > 32 && /^[a-f0-9]+$/i.test(value)) return '[REDACTED]';
+      if (Array.isArray(value)) return value.map(item => this.redact(item));
+      if (typeof value === 'object') {
+        const redacted = {};
+        for (const [key, val] of Object.entries(value)) {
+          redacted[key] = this.SENSITIVE_FIELDS.some(f => key.toLowerCase().includes(f)) ? '[REDACTED]' : this.redact(val);
+        }
+        return redacted;
+      }
+      return value;
+    },
+    
+    _processArgs(...args) {
+      return args.map(arg => this.redact(arg));
+    },
+    
+    debug(...args) {
+      if (this.DEBUG) console.debug('[Nexus Content]', ...this._processArgs(...args));
+    },
+    info(...args) {
+      console.info('[Nexus Content]', ...this._processArgs(...args));
+    },
+    error(...args) {
+      console.error('[Nexus Content]', ...this._processArgs(...args));
+    }
+  };
+
   // Guard against multiple injections
   if (window.__NEXUS_WALLET_CONTENT_INJECTED__) {
-    console.log('Nexus Wallet content script already injected, skipping');
+    Logger.debug('Content script already injected, skipping');
     return;
   }
   window.__NEXUS_WALLET_CONTENT_INJECTED__ = true;
@@ -31,10 +65,7 @@
     if (event.data.type && event.data.type === 'NEXUS_PROVIDER_REQUEST') {
       const { id, method, params } = event.data;
       
-      console.log('=== Content script received NEXUS_PROVIDER_REQUEST ===');
-      console.log('ID:', id);
-      console.log('Method:', method);
-      console.log('Params:', params);
+      Logger.debug('Request:', method);
 
       try {
         // Check if extension context is valid
@@ -50,9 +81,6 @@
             origin: window.location.origin
           }
         });
-        
-        console.log('=== Content script received response from background ===');
-        console.log('Response:', response);
 
         // Send response back to page
         window.postMessage({
@@ -67,6 +95,7 @@
         if (error.message.includes('Extension context invalidated') || 
             error.message.includes('message port closed')) {
           errorMessage = 'Extension was reloaded. Please refresh this page.';
+          Logger.error('Extension context invalidated');
         }
         
         window.postMessage({
@@ -78,5 +107,5 @@
     }
   });
 
-  console.log('Nexus Wallet content script injected');
+  Logger.info('Content script injected');
 })();

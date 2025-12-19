@@ -78,11 +78,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   
   // Handle transaction approval responses
   if (request.type === 'TRANSACTION_APPROVAL_RESPONSE') {
-    const { requestId, approved, pin, transactionData } = request;
+    const { requestId, approved, pin, distAccount, transactionData } = request;
     console.log('=== TRANSACTION_APPROVAL_RESPONSE received ===');
     console.log('RequestId:', requestId);
     console.log('Approved:', approved);
     console.log('Has PIN:', !!pin);
+    console.log('DIST Account:', distAccount);
     console.log('TransactionData:', transactionData);
     console.log('Pending approvals map size:', pendingTransactionApprovals.size);
     console.log('Pending approvals has this requestId:', pendingTransactionApprovals.has(requestId));
@@ -90,10 +91,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const pending = pendingTransactionApprovals.get(requestId);
     if (pending) {
       console.log('Found pending approval, resolving...');
-      // Resolve the promise with approval status, PIN, and window info
+      // Resolve the promise with approval status, PIN, distAccount, and window info
       pending.resolve({ 
         approved, 
-        pin, 
+        pin,
+        distAccount,
         transactionData,
         requestId: pending.requestId,
         windowId: pending.windowId

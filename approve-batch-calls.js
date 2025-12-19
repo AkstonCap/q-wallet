@@ -111,7 +111,7 @@ async function loadDistAccounts() {
     // Filter for DIST accounts with balance >= 1
     const distAccounts = accounts.filter(account => {
       const balance = parseFloat(account.balance || 0);
-      return account.token_name === 'DIST' && balance >= 1;
+      return account.ticker === 'DIST' && balance >= 1;
     });
     
     // Clear loading option
@@ -162,9 +162,15 @@ function setupEventListeners() {
 // Handle approve button
 async function handleApprove() {
   const pin = document.getElementById('pin-input').value;
+  const distAccount = document.getElementById('dist-account-select').value;
   
   if (!pin) {
     alert('Please enter your PIN');
+    return;
+  }
+  
+  if (!distAccount) {
+    alert('Please select a DIST account to pay the service fee');
     return;
   }
   
@@ -179,6 +185,7 @@ async function handleApprove() {
     requestId: requestId,
     approved: true,
     pin: pin,
+    distAccount: distAccount,
     transactionData: {
       origin: document.getElementById('origin').textContent,
       calls: callsData,

@@ -4,6 +4,8 @@ A secure cryptocurrency wallet browser extension for the Nexus blockchain, simil
 
 ![Nexus Wallet](icons/icon128.png)
 
+> **🔥 Why Q-Wallet?** See our [comparison with MetaMask, Trust Wallet, and other competitors](Q-WALLET-VS-COMPETITION.md) to understand why Q-Wallet offers quantum-resistant security that traditional wallets cannot match.
+
 ## Features
 
 ### Core Wallet Functionality

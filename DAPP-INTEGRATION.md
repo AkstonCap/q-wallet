@@ -194,6 +194,25 @@ if (accounts.length === 0) {
 }
 ```
 
+### window.nexus.listAccounts()
+List all accounts for the logged in user, including all token accounts. This provides detailed information about each account.
+
+**Returns:** `Promise<Array<object>>` - Array of account objects, each with:
+- `name` (string): Account name
+- `address` (string): Account address (register address)
+- `ticker` (string): Token ticker (e.g., 'NXS', 'USDT')
+- `token` (string): Token address
+- `balance` (number): Account balance
+
+**Example:**
+```javascript
+const accounts = await window.nexus.listAccounts();
+accounts.forEach(account => {
+  console.log(`${account.name} (${account.ticker}): ${account.balance}`);
+  console.log(`Address: ${account.address}`);
+});
+```
+
 ### window.nexus.getBalance(account)
 Get balance for specified account.
 

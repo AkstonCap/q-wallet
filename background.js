@@ -240,6 +240,13 @@ async function handleMessage(request, sender) {
       }
       return { result: await wallet.getAllBalances() };
 
+    case 'dapp.listAccounts':
+      await checkDAppPermission(params.origin, sender.url);
+      if (!wallet.isLoggedIn()) {
+        throw new Error('Wallet not connected');
+      }
+      return { result: await wallet.listAccounts() };
+
     default:
       throw new Error(`Unknown method: ${method}`);
   }

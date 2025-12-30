@@ -171,6 +171,20 @@
       }
     }
 
+    // List all accounts for logged in user
+    async listAccounts() {
+      try {
+        const result = await this.request({
+          method: 'dapp.listAccounts',
+          params: {}
+        });
+        return result;
+      } catch (error) {
+        Logger.error('Failed to list accounts:', error.message);
+        throw error;
+      }
+    }
+
     // Send NXS or tokens
     async sendTransaction({ from, to, amount, reference }) {
       try {

@@ -41,9 +41,10 @@
       padding: 20px;
       display: flex;
       flex-direction: column;
-      justify-content: center;
       align-items: center;
       text-align: center;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
     
     .icon {
@@ -119,6 +120,102 @@
     .btn-block:hover {
       background: #5a6268;
     }
+    
+    .fee-box {
+      background: #fff3cd;
+      border: 2px solid #ffc107;
+      border-radius: 8px;
+      padding: 16px;
+      margin: 16px 0;
+      text-align: left;
+    }
+    
+    .fee-title {
+      font-weight: 600;
+      font-size: 14px;
+      color: #856404;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+    
+    .fee-details {
+      margin-bottom: 12px;
+    }
+    
+    .fee-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 8px 0;
+      font-size: 13px;
+    }
+    
+    .fee-label {
+      font-weight: 500;
+      color: #666;
+    }
+    
+    .fee-value {
+      font-weight: 600;
+      color: #333;
+    }
+    
+    .fee-value-small {
+      font-weight: 600;
+      color: #333;
+      font-size: 11px;
+      word-break: break-all;
+      max-width: 200px;
+      text-align: right;
+    }
+    
+    .account-selector {
+      margin-top: 12px;
+    }
+    
+    .account-selector label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #666;
+      margin-bottom: 6px;
+    }
+    
+    .account-selector select {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 13px;
+      background: white;
+    }
+    
+    .account-balance {
+      margin-top: 6px;
+      font-size: 12px;
+      color: #666;
+      font-style: italic;
+    }
+    
+    .pin-input {
+      margin-top: 12px;
+    }
+    
+    .pin-input label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #666;
+      margin-bottom: 6px;
+    }
+    
+    .pin-input input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 13px;
+      font-family: monospace;
+    }
   </style>
 </head>
 <body>
@@ -131,6 +228,38 @@
     <div class="message">This site wants to connect to your wallet:</div>
     <div class="origin" id="origin-text">Loading...</div>
     <div class="warning">⚠️ Only approve sites you trust</div>
+    
+    <!-- Fee information (shown only when fee is required) -->
+    <div id="fee-section" style="display: none;">
+      <div class="fee-box">
+        <div class="fee-title">💳 Connection Fee Required</div>
+        <div class="fee-details">
+          <div class="fee-row">
+            <span class="fee-label">Amount:</span>
+            <span class="fee-value" id="fee-amount">-</span>
+          </div>
+          <div class="fee-row">
+            <span class="fee-label">Valid for:</span>
+            <span class="fee-value" id="fee-validity">-</span>
+          </div>
+          <div class="fee-row">
+            <span class="fee-label">To:</span>
+            <span class="fee-value-small" id="fee-recipient">-</span>
+          </div>
+        </div>
+        <div class="account-selector">
+          <label for="payment-account">Payment Account:</label>
+          <select id="payment-account">
+            <option value="">Loading accounts...</option>
+          </select>
+          <div class="account-balance" id="account-balance-display"></div>
+        </div>
+        <div class="pin-input">
+          <label for="payment-pin">PIN:</label>
+          <input type="password" id="payment-pin" placeholder="Enter your PIN" maxlength="8" />
+        </div>
+      </div>
+    </div>
     
     <div class="buttons">
       <button class="btn-deny" id="deny-btn">Deny</button>

@@ -119,6 +119,43 @@
       }
     }
 
+    // Connect with fee requirement
+    // feeConfig: { tokenName: 'DIST', amount: 1, recipientAddress: '...', validitySeconds: 43200 }
+    async connectWithFee(feeConfig) {
+      try {
+        // Validate fee config
+        if (!feeConfig || !feeConfig.tokenName || !feeConfig.amount || !feeConfig.recipientAddress) {
+          throw new Error('Fee configuration must include tokenName, amount, and recipientAddress');
+        }
+        
+        if (!feeConfig.validitySeconds || feeConfig.validitySeconds <= 0) {
+          throw new Error('validitySeconds must be a positive number');
+        }
+        
+        const result = await this.request({
+          method: 'dapp.requestConnectionWithFee',
+          params: {
+            fee: {
+              tokenName: feeConfig.tokenName,
+              amount: parseFloat(feeConfig.amount),
+              recipientAddress: feeConfig.recipientAddress,
+              validitySeconds: parseInt(feeConfig.validitySeconds)
+            }
+          }
+        });
+        
+        this.isConnected = result.connected;
+        if (result.accounts && result.accounts.length > 0) {
+          this.selectedAddress = result.accounts[0];
+        }
+        
+        return result.accounts;
+      } catch (error) {
+        Logger.error('Failed to connect with fee:', error.message);
+        throw error;
+      }
+    }
+
     // Get connected accounts
     async getAccounts() {
       try {

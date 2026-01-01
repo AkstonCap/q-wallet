@@ -455,6 +455,72 @@ class StorageService {
 
     return inactiveDomains;
   }
+
+  // ===== PAID CONNECTION TRACKING =====
+
+  // Store paid connection with expiry
+  async addPaidConnection(domain, feeInfo) {
+    const paidConnections = await this.get('paidConnections') || {};
+    
+    paidConnections[domain] = {
+      tokenName: feeInfo.tokenName,
+      amount: feeInfo.amount,
+      recipientAddress: feeInfo.recipientAddress,
+      accountName: feeInfo.accountName,
+      txid: feeInfo.txid,
+      paidAt: feeInfo.timestamp || Date.now(),
+      expiresAt: Date.now() + (feeInfo.validitySeconds * 1000)
+    };
+    
+    await this.set('paidConnections', paidConnections);
+  }
+
+  // Check if domain has valid paid connection
+  async hasPaidConnection(domain, tokenName, recipientAddress) {
+    const paidConnections = await this.get('paidConnections') || {};
+    
+    const connectionInfo = paidConnections[domain];
+    if (!connectionInfo) {
+      return false;
+    }
+    
+    // Check if expired
+    if (Date.now() > connectionInfo.expiresAt) {
+      return false;
+    }
+    
+    // Check if token and recipient match
+    if (connectionInfo.tokenName !== tokenName || 
+        connectionInfo.recipientAddress !== recipientAddress) {
+      return false;
+    }
+    
+    return true;
+  }
+
+  // Get paid connection info
+  async getPaidConnectionInfo(domain) {
+    const paidConnections = await this.get('paidConnections') || {};
+    return paidConnections[domain] || null;
+  }
+
+  // Remove expired paid connections (cleanup)
+  async cleanupExpiredPaidConnections() {
+    const paidConnections = await this.get('paidConnections') || {};
+    const now = Date.now();
+    
+    let hasChanges = false;
+    for (const domain in paidConnections) {
+      if (paidConnections[domain].expiresAt < now) {
+        delete paidConnections[domain];
+        hasChanges = true;
+      }
+    }
+    
+    if (hasChanges) {
+      await this.set('paidConnections', paidConnections);
+    }
+  }
 }
 
 // Export for use in other modules

@@ -278,6 +278,96 @@ class NexusAPI {
     return this.request('system/get/info');
   }
 
+  // ===== CONNECTION FEE CHECKING =====
+
+  // Check if user has paid connection fee within time window
+  // Returns: { hasPaid: boolean, accountName: string|null, txid: string|null, timestamp: number|null }
+  async checkConnectionFeePayment(session, recipientAddress, tokenName, requiredAmount, timeWindowSeconds) {
+    try {
+      // Get all accounts for this session
+      const accountsResponse = await this.listAccounts(session);
+      const accounts = accountsResponse.result || [];
+      
+      if (!accounts || accounts.length === 0) {
+        return { hasPaid: false, accountName: null, txid: null, timestamp: null, confirmations: null };
+      }
+      
+      const now = Math.floor(Date.now() / 1000); // Current time in seconds
+      const cutoffTime = now - timeWindowSeconds;
+      
+      // Check each account's transaction history
+      for (const account of accounts) {
+        const accountName = account.name || account.address;
+        
+        // Get account info to check token type
+        const accountInfo = await this.getAccount(accountName, session);
+        const accountResult = accountInfo.result || accountInfo;
+        
+        // Skip if token doesn't match
+        const accountToken = accountResult.token_name || accountResult.token || 'NXS';
+        if (accountToken !== tokenName) {
+          continue;
+        }
+        
+        try {
+          // Get transaction history for this account
+          const txResponse = await this.request('finance/transactions/account', {
+            session,
+            name: accountName,
+            limit: 1000
+          });
+          
+          const transactions = txResponse.result || [];
+          
+          // Look for matching debit transactions
+          for (const tx of transactions) {
+
+            // Check timestamp
+            const txTimestamp = tx.timestamp || 0;
+            if (txTimestamp < cutoffTime) {
+              return { hasPaid: false, accountName: null, txid: null, timestamp: null }; // Too old
+            }
+
+            for (const contract of tx.contracts || []) {
+              // Skip if not a debit
+              if (contract.OP !== 'DEBIT') {
+                continue;
+              }
+            
+              // Check recipient matches
+              const txRecipientAddress = contract.to.address || '';
+              const txRecipientName = contract.to.name || '';
+              if (txRecipientAddress !== recipientAddress && txRecipientName !== recipientAddress) {
+                continue;
+              }
+            
+              // Check amount matches or exceeds required
+              const txAmount = parseFloat(contract.amount || 0);
+              if (txAmount >= requiredAmount) {
+                return {
+                  hasPaid: true,
+                  accountName: accountName,
+                  txid: tx.txid,
+                  timestamp: txTimestamp,
+                  confirmations: tx.confirmations || 0
+                };
+              }
+            }
+          }
+        } catch (txError) {
+          // Skip this account if we can't get transactions
+          console.warn('Could not get transactions for account:', accountName, txError.message);
+          continue;
+        }
+      }
+      
+      return { hasPaid: false, accountName: null, txid: null, timestamp: null };
+    } catch (error) {
+      console.error('Error checking connection fee payment:', error);
+      throw error;
+    }
+  }
+
 }
 
 // Export for use in other modules

@@ -482,7 +482,7 @@ class WalletService {
           const feeResult = await this.api.debit(
             feeInToken ? accountName : 'default', // USDD from same account, NXS from default
             distordiaFee,
-            isNXS ? DISTORDIA_FEE_ADDRESS : DISTORDIA_FEE_ADDRESS_USDD,
+            isNXS ? DISTORDIA_FEE_ADDRESS : isUSDD ? DISTORDIA_FEE_ADDRESS_USDD : '',
             pin,
             '',
             this.session

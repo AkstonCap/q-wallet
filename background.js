@@ -240,6 +240,10 @@ async function handleMessage(request, sender) {
       // Allow site to disconnect itself without approval
       return await handleDAppDisconnect(params.origin, sender.url);
 
+    case 'dapp.isLoggedIn':
+      // Allow any dApp to check login status without permission
+      return { result: { isLoggedIn: wallet.isLoggedIn() } };
+
     case 'dapp.getAllBalances':
       await checkDAppPermission(params.origin, sender.url);
       if (!wallet.isLoggedIn()) {
@@ -409,46 +413,7 @@ async function handleDAppConnectionWithFee(sender, params) {
     throw new Error('This domain has been blocked from connecting to your wallet');
   }
 
-  // Check if already approved (free connection)
-  const isApproved = await storage.isDomainApproved(identifier);
-  if (isApproved) {
-    // Update activity timestamp
-    await storage.updateDomainActivity(identifier);
-    
-    const address = await wallet.getAccountAddress('default');
-    return {
-      result: {
-        connected: true,
-        accounts: [address],
-        paidConnection: false
-      }
-    };
-  }
-
-  // Check if there's already a valid paid connection
-  const hasPaidConnection = await storage.hasPaidConnection(
-    identifier, 
-    fee.tokenName, 
-    fee.recipientAddress
-  );
-  
-  if (hasPaidConnection) {
-    // Already paid and not expired - approve connection
-    await storage.addApprovedDomain(identifier);
-    await storage.updateDomainActivity(identifier);
-    
-    const address = await wallet.getAccountAddress('default');
-    return {
-      result: {
-        connected: true,
-        accounts: [address],
-        paidConnection: true,
-        existingPayment: true
-      }
-    };
-  }
-
-  // Check if user has already paid within the validity window
+  // Check if user has already paid within the validity window (on-chain verification)
   const paymentCheck = await wallet.api.checkConnectionFeePayment(
     wallet.session,
     fee.recipientAddress,
@@ -458,7 +423,7 @@ async function handleDAppConnectionWithFee(sender, params) {
   );
   
   if (paymentCheck.hasPaid) {
-    // Found existing payment - store it and approve
+    // Found existing payment - store it for tracking
     await storage.addPaidConnection(identifier, {
       tokenName: fee.tokenName,
       amount: fee.amount,
@@ -469,18 +434,26 @@ async function handleDAppConnectionWithFee(sender, params) {
       validitySeconds: fee.validitySeconds
     });
     
-    await storage.addApprovedDomain(identifier);
-    await storage.updateDomainActivity(identifier);
+    // Request user approval WITHOUT fee (free connection flow)
+    const approved = await requestUserApproval(identifier);
+    const isApproved = typeof approved === 'boolean' ? approved : approved.approved;
     
-    const address = await wallet.getAccountAddress('default');
-    return {
-      result: {
-        connected: true,
-        accounts: [address],
-        paidConnection: true,
-        existingPayment: true
-      }
-    };
+    if (isApproved) {
+      await storage.addApprovedDomain(identifier);
+      await storage.updateDomainActivity(identifier);
+      
+      const address = await wallet.getAccountAddress('default');
+      return {
+        result: {
+          connected: true,
+          accounts: [address],
+          paidConnection: true,
+          existingPayment: true
+        }
+      };
+    } else {
+      throw new Error('User denied connection request');
+    }
   }
 
   // Need to request payment - show approval with fee
@@ -509,7 +482,7 @@ async function handleDAppConnectionWithFee(sender, params) {
           fee.amount,
           fee.recipientAddress,
           approvalResult.pin,
-          `Connection fee for ${identifier}`
+          '' // Reference must be empty or numeric - empty is safer
         );
         
         // Store paid connection info

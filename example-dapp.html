@@ -140,6 +140,7 @@
     <!-- Connection Section -->
     <div class="section">
       <h3>1. Connect Wallet</h3>
+      <button onclick="checkLoginStatus()" style="background: #17a2b8; margin-bottom: 10px;">Check if Wallet is Logged In</button>
       <div class="button-group">
         <button id="connect-btn" onclick="connectWallet()">Connect Wallet (Free)</button>
         <button id="connect-fee-btn" onclick="connectWalletWithFee()" class="secondary">Connect with Fee (1 DIST for 12h)</button>
@@ -266,11 +267,30 @@ if (typeof window.nexus !== 'undefined') {
     // Check if Nexus Wallet is installed
     async function checkWalletInstalled() {
       if (typeof window.nexus === 'undefined') {
-        updateStatus('Nexus Wallet not detected! Please ithe extension.', 'error');
+        updateStatus('Nexus Wallet not detected! Please install the extension.', 'error');
         return false;
       }
       updateStatus('Nexus Wallet detected!', 'connected');
       return true;
+    }
+
+    // Check if wallet is logged in (without connection prompt)
+    async function checkLoginStatus() {
+      try {
+        if (!await checkWalletInstalled()) return false;
+        
+        const isLoggedIn = await window.nexus.isLoggedIn();
+        if (isLoggedIn) {
+          updateStatus('✓ Q-Wallet is logged in. Ready to connect!', 'connected');
+        } else {
+          updateStatus('✗ Q-Wallet is not logged in. Please open the wallet and log in first.', 'error');
+        }
+        return isLoggedIn;
+      } catch (error) {
+        console.error('Failed to check login status:', error);
+        updateStatus('Failed to check login status: ' + error.message, 'error');
+        return false;
+      }
     }
 
     // Connect to wallet

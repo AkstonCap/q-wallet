@@ -194,6 +194,20 @@
       }
     }
 
+    // Check if wallet is logged in (without requesting connection)
+    async isLoggedIn() {
+      try {
+        const result = await this.request({
+          method: 'dapp.isLoggedIn',
+          params: {}
+        });
+        return result?.isLoggedIn || false;
+      } catch (error) {
+        Logger.error('Failed to check login status:', error.message);
+        return false;
+      }
+    }
+
     // Get all token balances
     async getAllBalances() {
       try {

@@ -86,11 +86,11 @@ Load directly in browser: `chrome://extensions` → "Load unpacked" → select p
 ### API Patterns (services/nexus-api.js)
 All methods call `/endpoint` with POST JSON. Example:
 ```javascript
-await api.request('users/login/user', {username, password, pin})
+await api.request('sessions/create/local', {username, password, pin})
 await api.request('finance/get/account', {session, name: 'default'})
 ```
 
-See [Nexus api docs/](Nexus%20api%20docs/) for full API reference (especially [API/README.MD](Nexus%20api%20docs/API/README.MD)).
+See [Nexus api docs/API/](Nexus%20api%20docs/API/) for full API reference (especially [README.MD](Nexus%20api%20docs/API/README.MD)).
 
 ## Code Conventions
 

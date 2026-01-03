@@ -222,7 +222,6 @@ class NexusAPI {
 
   // Send NXS or tokens (debit)
   async debit(accountName, amount, recipientAddress, pin, reference = '', session) {
-    console.log(`[API] Debit request: ${amount} from ${accountName} to ${recipientAddress}`);
     const params = {
       pin,
       session,
@@ -231,14 +230,15 @@ class NexusAPI {
       to: recipientAddress
     };
     
-    // Only include reference if it's not empty
-    if (reference && reference.trim()) {
-      params.reference = reference;
+    // Only include reference if it's a valid number (64-bit unsigned integer)
+    if (reference && reference !== '' && !isNaN(reference)) {
+      const refNum = parseInt(reference, 10);
+      if (refNum >= 0 && refNum <= 18446744073709551615) {
+        params.reference = refNum;
+      }
     }
     
-    console.log('[API] Debit params:', { ...params, pin: '***' });
     const result = await this.request('finance/debit/account', params);
-    console.log('[API] Debit result:', result);
     return result;
   }
 
@@ -299,22 +299,20 @@ class NexusAPI {
       for (const account of accounts) {
         const accountName = account.name || account.address;
         
-        // Get account info to check token type
-        const accountInfo = await this.getAccount(accountName, session);
-        const accountResult = accountInfo.result || accountInfo;
-        
         // Skip if token doesn't match
-        const accountToken = accountResult.token_name || accountResult.token || 'NXS';
+        const accountToken = account.ticker || account.token || 'NXS';
         if (accountToken !== tokenName) {
           continue;
         }
         
         try {
           // Get transaction history for this account
-          const txResponse = await this.request('finance/transactions/account', {
+          const txResponse = await this.request('finance/transactions/account/txid,timestamp,confirmations,contracts', {
             session,
             name: accountName,
-            limit: 1000
+            limit: 1000,
+            sort: 'timestamp',
+            order: 'desc'
           });
           
           const transactions = txResponse.result || [];
@@ -335,8 +333,8 @@ class NexusAPI {
               }
             
               // Check recipient matches
-              const txRecipientAddress = contract.to.address || '';
-              const txRecipientName = contract.to.name || '';
+              const txRecipientAddress = contract.to?.address || '';
+              const txRecipientName = contract.to?.name || '';
               if (txRecipientAddress !== recipientAddress && txRecipientName !== recipientAddress) {
                 continue;
               }

@@ -44,7 +44,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   
   // Handle connection approval responses
   if (request.type === 'CONNECTION_RESPONSE') {
-    const { requestId, approved, blocked, origin } = request;
+    const { requestId, approved, blocked, origin, paymentAccount, pin } = request;
     Logger.debug('Connection response:', approved ? 'approved' : 'denied', origin);
     
     const pending = pendingApprovals.get(requestId);
@@ -57,8 +57,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
       }
       
-      // Resolve the promise
-      pending.resolve(approved);
+      // Resolve the promise with approval, payment account, and PIN info
+      pending.resolve({
+        approved,
+        paymentAccount: paymentAccount || null,
+        pin: pin || null
+      });
       pendingApprovals.delete(requestId);
       
       // Close the window
@@ -189,6 +193,9 @@ async function handleMessage(request, sender) {
     case 'dapp.requestConnection':
       return await handleDAppConnection(sender, params);
     
+    case 'dapp.requestConnectionWithFee':
+      return await handleDAppConnectionWithFee(sender, params);
+    
     case 'dapp.getAccounts':
       await checkDAppPermission(params.origin, sender.url);
       if (!wallet.isLoggedIn()) {
@@ -232,6 +239,10 @@ async function handleMessage(request, sender) {
       Logger.debug('dApp disconnect:', params.origin);
       // Allow site to disconnect itself without approval
       return await handleDAppDisconnect(params.origin, sender.url);
+
+    case 'dapp.isLoggedIn':
+      // Allow any dApp to check login status without permission
+      return { result: { isLoggedIn: wallet.isLoggedIn() } };
 
     case 'dapp.getAllBalances':
       await checkDAppPermission(params.origin, sender.url);
@@ -349,7 +360,8 @@ async function handleDAppConnection(sender, params) {
   const connectionPromise = (async () => {
     try {
       // Request user approval via notification
-      const approved = await requestUserApproval(identifier);
+      const approvalResult = await requestUserApproval(identifier);
+      const approved = typeof approvalResult === 'boolean' ? approvalResult : approvalResult.approved;
       
       if (approved) {
         await storage.addApprovedDomain(identifier);
@@ -361,6 +373,147 @@ async function handleDAppConnection(sender, params) {
           result: {
             connected: true,
             accounts: [address]
+          }
+        };
+      } else {
+        throw new Error('User denied connection request');
+      }
+    } finally {
+      // Clean up pending marker
+      recentConnectionRequests.delete(pendingKey);
+    }
+  })();
+  
+  // Store the promise so duplicate requests can wait for this one
+  recentConnectionRequests.set(pendingKey, connectionPromise);
+  
+  return connectionPromise;
+}
+
+// Handle DApp connection request with fee requirement
+async function handleDAppConnectionWithFee(sender, params) {
+  const { origin, fee } = params;
+  
+  // Validate fee parameters
+  if (!fee || !fee.tokenName || !fee.amount || !fee.recipientAddress || !fee.validitySeconds) {
+    throw new Error('Invalid fee configuration');
+  }
+  
+  // For local files, use full URL instead of origin to distinguish between files
+  const senderUrl = sender.url || origin;
+  const identifier = senderUrl.startsWith('file://') ? senderUrl : origin;
+  
+  Logger.debug('dApp connection with fee request:', identifier, fee);
+  
+  // Ensure wallet is properly initialized with session data
+  await ensureWalletInitialized();
+  
+  if (!wallet.isLoggedIn()) {
+    throw new Error('Wallet not connected. Please log in first.');
+  }
+
+  const storage = new StorageService();
+  
+  // Check if domain is blocked
+  const isBlocked = await storage.isDomainBlocked(identifier);
+  if (isBlocked) {
+    throw new Error('This domain has been blocked from connecting to your wallet');
+  }
+
+  // Check if user has already paid within the validity window (on-chain verification)
+  const paymentCheck = await wallet.api.checkConnectionFeePayment(
+    wallet.session,
+    fee.recipientAddress,
+    fee.tokenName,
+    fee.amount,
+    fee.validitySeconds
+  );
+  
+  if (paymentCheck.hasPaid) {
+    // Found existing payment - store it for tracking
+    await storage.addPaidConnection(identifier, {
+      tokenName: fee.tokenName,
+      amount: fee.amount,
+      recipientAddress: fee.recipientAddress,
+      accountName: paymentCheck.accountName,
+      txid: paymentCheck.txid,
+      timestamp: paymentCheck.timestamp,
+      validitySeconds: fee.validitySeconds
+    });
+    
+    // Request user approval WITHOUT fee (free connection flow)
+    const approved = await requestUserApproval(identifier);
+    const isApproved = typeof approved === 'boolean' ? approved : approved.approved;
+    
+    if (isApproved) {
+      await storage.addApprovedDomain(identifier);
+      await storage.updateDomainActivity(identifier);
+      
+      const address = await wallet.getAccountAddress('default');
+      return {
+        result: {
+          connected: true,
+          accounts: [address],
+          paidConnection: true,
+          existingPayment: true
+        }
+      };
+    } else {
+      throw new Error('User denied connection request');
+    }
+  }
+
+  // Need to request payment - show approval with fee
+  const pendingKey = `connection:${identifier}`;
+  const existingPending = recentConnectionRequests.get(pendingKey);
+  if (existingPending) {
+    Logger.debug('Connection request already pending:', identifier);
+    return existingPending;
+  }
+  
+  // Create a promise for this connection request with fee
+  const connectionPromise = (async () => {
+    try {
+      // Request user approval with fee payment
+      const approvalResult = await requestUserApprovalWithFee(identifier, fee);
+      
+      if (approvalResult.approved) {
+        // User approved and selected payment account
+        // Execute the fee payment with provided PIN
+        if (!approvalResult.pin) {
+          throw new Error('PIN is required for fee payment');
+        }
+        
+        const txResult = await wallet.send(
+          approvalResult.paymentAccount,
+          fee.amount,
+          fee.recipientAddress,
+          approvalResult.pin,
+          '' // Reference must be empty or numeric - empty is safer
+        );
+        
+        // Store paid connection info
+        await storage.addPaidConnection(identifier, {
+          tokenName: fee.tokenName,
+          amount: fee.amount,
+          recipientAddress: fee.recipientAddress,
+          accountName: approvalResult.paymentAccount,
+          txid: txResult.txid,
+          timestamp: Math.floor(Date.now() / 1000),
+          validitySeconds: fee.validitySeconds
+        });
+        
+        // Approve the connection
+        await storage.addApprovedDomain(identifier);
+        await storage.updateDomainActivity(identifier);
+        
+        const address = await wallet.getAccountAddress('default');
+        return {
+          result: {
+            connected: true,
+            accounts: [address],
+            paidConnection: true,
+            paymentTxid: txResult.txid
           }
         };
       } else {
@@ -424,6 +577,58 @@ async function requestUserApproval(origin) {
           chrome.windows.remove(window.id).catch(() => {});
         }
       }, 120000);
+    });
+  });
+}
+
+// Request user approval for dApp connection with fee
+async function requestUserApprovalWithFee(origin, fee) {
+  return new Promise((resolve, reject) => {
+    const requestId = Date.now().toString();
+    Logger.debug('Requesting dApp approval with fee:', origin, fee);
+    
+    // Store the pending request
+    pendingApprovals.set(requestId, { origin, fee, resolve, reject });
+    
+    // Create popup window for approval with fee details
+    const width = 450;
+    const height = 650;
+    
+    const feeParam = encodeURIComponent(JSON.stringify(fee));
+    
+    chrome.windows.create({
+      url: `approve-connection.html?origin=${encodeURIComponent(origin)}&requestId=${requestId}&fee=${feeParam}`,
+      type: 'popup',
+      width: width,
+      height: height,
+      focused: true
+    }, (window) => {
+      if (chrome.runtime.lastError) {
+        Logger.error('Failed to create approval window:', chrome.runtime.lastError.message);
+        pendingApprovals.delete(requestId);
+        reject(new Error('Unable to show approval dialog'));
+        return;
+      }
+      
+      Logger.debug('Fee approval window created for:', origin);
+      
+      // Store window ID with the request
+      const pending = pendingApprovals.get(requestId);
+      if (pending) {
+        pending.windowId = window.id;
+      }
+      
+      // Add timeout - auto-deny after 3 minutes (longer for fee approval)
+      setTimeout(() => {
+        if (pendingApprovals.has(requestId)) {
+          Logger.warn('Fee approval request timed out:', origin);
+          pendingApprovals.delete(requestId);
+          reject(new Error('Connection request timed out'));
+          
+          // Close the window if still open
+          chrome.windows.remove(window.id).catch(() => {});
+        }
+      }, 180000);
     });
   });
 }

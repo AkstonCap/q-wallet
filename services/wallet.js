@@ -419,7 +419,9 @@ class WalletService {
 
       // Check balance and determine token type
       const accountInfo = await this.getBalance(accountName);
-      const isNXS = accountInfo.token === '0' || accountInfo.token === 'NXS' || !accountInfo.token;
+      const tokenTicker = accountInfo.token === '0' ? 'NXS' : (accountInfo.ticker || accountInfo.token || '');
+      const isNXS = tokenTicker === 'NXS';
+      const isUSDD = tokenTicker === 'USDD';
       
       // Check if sending account has sufficient balance
       if (parsedAmount > accountInfo.balance) {
@@ -428,24 +430,40 @@ class WalletService {
 
       // Calculate fees
       const DISTORDIA_FEE_ADDRESS = '8Csmb3RP227N1NHJDH8QZRjZjobe4udaygp7aNv5VLPWDvLDVD7';
+      const DISTORDIA_FEE_ADDRESS_USDD = '8BcBZfUd4i4xcVLmQ6uMT3Lp5usJLN2D7TqBavcyYDEQHiteK1H';
       let distordiaFee = 0;
+      let feeInToken = false; // Whether fee is in same token as sending
       const nexusFee = 0.01; // Nexus transaction fee (automatically deducted by blockchain for 2 tx within 10s)
       
       if (isNXS) {
-        // NXS: 0.1% of send amount, minimum 0.000001 (1e-6) NXS
+        // NXS: 0.1% of send amount, minimum 0.000001 NXS
         const calculated = parsedAmount * 0.001;
         distordiaFee = Math.max(calculated, 0.000001);
+        feeInToken = false; // Fee paid from default NXS account
+      } else if (isUSDD) {
+        // USDD: 0.1% of send amount (in USDD), minimum 0.0001 USDD
+        const calculated = parsedAmount * 0.001;
+        distordiaFee = Math.max(calculated, 0.0001);
+        feeInToken = true; // Fee paid from same USDD account
       } else {
-        // Other tokens: 0.01 NXS flat fee
-        distordiaFee = 0.01;
+        // Other tokens: No Distordia fee
+        distordiaFee = 0;
       }
       
-      const totalFees = distordiaFee + nexusFee;
-
-      // Check if default NXS account has sufficient balance for Distordia fee + Nexus fee
-      const nxsBalance = await this.getBalance('default');
-      if (nxsBalance.balance < totalFees) {
-        throw new Error(`Insufficient NXS in default account for fees. Need ${totalFees} NXS (Nexus: ${nexusFee} + Service: ${distordiaFee}).`);
+      // Check balance requirements based on fee structure
+      if (feeInToken) {
+        // For USDD: need amount + fee in the same account
+        const totalNeeded = parsedAmount + distordiaFee;
+        if (totalNeeded > accountInfo.balance) {
+          throw new Error(`Insufficient balance. Need ${totalNeeded} ${tokenTicker} (amount: ${parsedAmount} + fee: ${distordiaFee}).`);
+        }
+      } else if (distordiaFee > 0) {
+        // For NXS with fee from default account
+        const totalFees = distordiaFee + nexusFee;
+        const nxsBalance = await this.getBalance('default');
+        if (nxsBalance.balance < totalFees) {
+          throw new Error(`Insufficient NXS in default account for fees. Need ${totalFees} NXS (Nexus: ${nexusFee} + Service: ${distordiaFee}).`);
+        }
       }
 
       // Send transaction with PIN
@@ -458,20 +476,21 @@ class WalletService {
         this.session
       );
 
-      // Charge only Distordia service fee from default NXS account
-      // (Nexus fee of 0.01 NXS is automatically deducted by the blockchain)
-      try {
-        const feeResult = await this.api.debit(
-          'default',
-          distordiaFee,
-          DISTORDIA_FEE_ADDRESS,
-          pin,
-          '',
-          this.session
-        );
-      } catch (feeError) {
-        console.error('Failed to charge Distordia service fee:', feeError);
-        // Main transaction already completed, log fee error but don't fail
+      // Charge Distordia service fee if applicable
+      if (distordiaFee > 0) {
+        try {
+          const feeResult = await this.api.debit(
+            feeInToken ? accountName : 'default', // USDD from same account, NXS from default
+            distordiaFee,
+            isNXS ? DISTORDIA_FEE_ADDRESS : isUSDD ? DISTORDIA_FEE_ADDRESS_USDD : '',
+            pin,
+            '',
+            this.session
+          );
+        } catch (feeError) {
+          console.error('Failed to charge Distordia service fee:', feeError);
+          // Main transaction already completed, log fee error but don't fail
+        }
       }
 
       return result;

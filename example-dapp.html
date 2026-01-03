@@ -59,6 +59,17 @@
       background: #ccc;
       cursor: not-allowed;
     }
+    button.secondary {
+      background: #6c757d;
+    }
+    button.secondary:hover {
+      background: #5a6268;
+    }
+    .button-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
     .section {
       margin: 30px 0;
       padding: 20px;
@@ -129,13 +140,21 @@
     <!-- Connection Section -->
     <div class="section">
       <h3>1. Connect Wallet</h3>
-      <button id="connect-btn" onclick="connectWallet()">Connect Wallet</button>
+      <button onclick="checkLoginStatus()" style="background: #17a2b8; margin-bottom: 10px;">Check if Wallet is Logged In</button>
+      <div class="button-group">
+        <button id="connect-btn" onclick="connectWallet()">Connect Wallet (Free)</button>
+        <button id="connect-fee-btn" onclick="connectWalletWithFee()" class="secondary">Connect with Fee (1 DIST for 12h)</button>
+      </div>
       <button id="check-btn" onclick="checkConnection()">Check Connection</button>
       <button id="disconnect-btn" onclick="disconnectWallet()" style="display: none; background: #dc3545;">Disconnect Wallet</button>
       
       <div id="account-info" style="display: none;">
         <div class="label">Connected Account:</div>
         <div class="info-item" id="account-address"></div>
+      </div>
+      <div id="connection-info" style="display: none;">
+        <div class="label">Connection Details:</div>
+        <div class="info-item" id="connection-details"></div>
       </div>
     </div>
 
@@ -280,11 +299,30 @@ if (typeof window.nexus !== 'undefined') {
     // Check if Nexus Wallet is installed
     async function checkWalletInstalled() {
       if (typeof window.nexus === 'undefined') {
-        updateStatus('Nexus Wallet not detected! Please ithe extension.', 'error');
+        updateStatus('Nexus Wallet not detected! Please install the extension.', 'error');
         return false;
       }
       updateStatus('Nexus Wallet detected!', 'connected');
       return true;
+    }
+
+    // Check if wallet is logged in (without connection prompt)
+    async function checkLoginStatus() {
+      try {
+        if (!await checkWalletInstalled()) return false;
+        
+        const isLoggedIn = await window.nexus.isLoggedIn();
+        if (isLoggedIn) {
+          updateStatus('✓ Q-Wallet is logged in. Ready to connect!', 'connected');
+        } else {
+          updateStatus('✗ Q-Wallet is not logged in. Please open the wallet and log in first.', 'error');
+        }
+        return isLoggedIn;
+      } catch (error) {
+        console.error('Failed to check login status:', error);
+        updateStatus('Failed to check login status: ' + error.message, 'error');
+        return false;
+      }
     }
 
     // Connect to wallet
@@ -302,7 +340,12 @@ if (typeof window.nexus !== 'undefined') {
           
           // Show disconnect button, hide connect button
           document.getElementById('connect-btn').style.display = 'none';
+          document.getElementById('connect-fee-btn').style.display = 'none';
           document.getElementById('disconnect-btn').style.display = 'inline-block';
+          
+          // Show connection info
+          document.getElementById('connection-details').textContent = 'Free connection';
+          document.getElementById('connection-info').style.display = 'block';
           
           // Enable buttons
           document.getElementById('accounts-btn').disabled = false;
@@ -321,6 +364,55 @@ if (typeof window.nexus !== 'undefined') {
       }
     }
 
+    // Connect wallet with fee requirement
+    async function connectWalletWithFee() {
+      try {
+        if (!await checkWalletInstalled()) return;
+
+        updateStatus('Connecting with fee requirement...', '');
+        
+        // Example: 1 DIST token for 12 hours access
+        // Replace recipientAddress with your actual treasury account
+        const feeConfig = {
+          tokenName: 'DIST',
+          amount: 1,
+          recipientAddress: 'DIST', // Example address - replace with your treasury
+          validitySeconds: 12 * 60 * 60 // 12 hours
+        };
+        
+        const accounts = await window.nexus.connectWithFee(feeConfig);
+        
+        if (accounts && accounts.length > 0) {
+          connectedAccount = accounts[0];
+          updateStatus('Connected with paid access!', 'connected');
+          document.getElementById('account-address').textContent = connectedAccount;
+          document.getElementById('account-info').style.display = 'block';
+          
+          // Show disconnect button, hide connect buttons
+          document.getElementById('connect-btn').style.display = 'none';
+          document.getElementById('connect-fee-btn').style.display = 'none';
+          document.getElementById('disconnect-btn').style.display = 'inline-block';
+          
+          // Show connection info
+          document.getElementById('connection-details').textContent = 
+            `Paid: ${feeConfig.amount} ${feeConfig.tokenName} for 12 hours`;
+          document.getElementById('connection-info').style.display = 'block';
+          
+          // Enable buttons
+          document.getElementById('balance-btn').disabled = false;
+          document.getElementById('send-btn').disabled = false;
+          document.getElementById('history-btn').disabled = false;
+          document.getElementById('batch-tx-btn').disabled = false;
+          document.getElementById('batch-call-btn').disabled = false;
+        } else {
+          updateStatus('No accounts found. Please log in to your wallet.', 'error');
+        }
+      } catch (error) {
+        console.error('Connection with fee failed:', error);
+        updateStatus('Connection with fee failed: ' + error.message, 'error');
+      }
+    }
+
     // Disconnect wallet
     async function disconnectWallet() {
       try {
@@ -332,12 +424,14 @@ if (typeof window.nexus !== 'undefined') {
         // Update UI
         updateStatus('Wallet disconnected successfully', '');
         document.getElementById('account-info').style.display = 'none';
+        document.getElementById('connection-info').style.display = 'none';
         document.getElementById('balance-info').style.display = 'none';
         document.getElementById('tx-result').style.display = 'none';
         document.getElementById('history-info').style.display = 'none';
         
-        // Show connect button, hide disconnect button
+        // Show connect buttons, hide disconnect button
         document.getElementById('connect-btn').style.display = 'inline-block';
+        document.getElementById('connect-fee-btn').style.display = 'inline-block';
         document.getElementById('disconnect-btn').style.display = 'none';
         
         // Disable buttons

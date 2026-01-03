@@ -893,23 +893,38 @@ function showPinModal(fromAccount, toAddress, amount, reference) {
   const selectedOption = select.options[select.selectedIndex];
   const ticker = selectedOption.dataset.ticker || 'Unknown';
   const isNXS = ticker === 'NXS';
+  const isUSDD = ticker === 'USDD';
   
   // Calculate Distordia service fee
   const parsedAmount = parseFloat(amount);
   let distordiaFee = 0;
+  let feeInToken = false;
+  
   if (isNXS) {
     // NXS: 0.1% of amount, minimum 0.000001 NXS
     distordiaFee = Math.max(parsedAmount * 0.001, 0.000001);
+    feeInToken = false;
+  } else if (isUSDD) {
+    // USDD: 0.1% of amount (in USDD), minimum 0.0001 USDD
+    distordiaFee = Math.max(parsedAmount * 0.001, 0.0001);
+    feeInToken = true;
   } else {
-    // Other tokens: 0.01 NXS flat fee
-    distordiaFee = 0.01;
+    // Other tokens: No Distordia fee
+    distordiaFee = 0;
   }
   
   // Nexus transaction fee (for multiple transactions within 10 seconds)
   const nexusFee = 0.01;
-  const totalFees = distordiaFee + nexusFee;
+  const totalNXSFees = feeInToken ? nexusFee : (distordiaFee + nexusFee);
   
-  const total = isNXS ? parsedAmount + totalFees : parsedAmount;
+  let total;
+  if (isNXS) {
+    total = parsedAmount + distordiaFee + nexusFee;
+  } else if (isUSDD) {
+    total = parsedAmount + distordiaFee;
+  } else {
+    total = parsedAmount;
+  }
   
   // Populate modal with transaction details
   document.getElementById('modal-from-account').textContent = `${fromAccount} (${ticker})`;
@@ -918,14 +933,24 @@ function showPinModal(fromAccount, toAddress, amount, reference) {
   document.getElementById('modal-amount').textContent = `${formatAmount(amount)} ${ticker}`;
   
   // Update fee row
-  document.getElementById('modal-fee').textContent = `${formatAmount(totalFees)} NXS`;
-  document.getElementById('modal-fee-details').textContent = `Nexus: ${formatAmount(nexusFee)} + Service: ${formatAmount(distordiaFee)}`;
+  if (distordiaFee === 0) {
+    document.getElementById('modal-fee').textContent = `${formatAmount(nexusFee)} NXS`;
+    document.getElementById('modal-fee-details').textContent = `Nexus: ${formatAmount(nexusFee)}`;
+  } else if (feeInToken) {
+    document.getElementById('modal-fee').textContent = `${formatAmount(distordiaFee)} ${ticker} + ${formatAmount(nexusFee)} NXS`;
+    document.getElementById('modal-fee-details').textContent = `Service: ${formatAmount(distordiaFee)} ${ticker} + Nexus: ${formatAmount(nexusFee)} NXS`;
+  } else {
+    document.getElementById('modal-fee').textContent = `${formatAmount(totalNXSFees)} NXS`;
+    document.getElementById('modal-fee-details').textContent = `Nexus: ${formatAmount(nexusFee)} + Service: ${formatAmount(distordiaFee)}`;
+  }
   
   // Update total
   if (isNXS) {
     document.getElementById('modal-total').textContent = `${formatAmount(total)} NXS`;
+  } else if (isUSDD) {
+    document.getElementById('modal-total').textContent = `${formatAmount(total)} USDD + ${formatAmount(nexusFee)} NXS`;
   } else {
-    document.getElementById('modal-total').textContent = `${formatAmount(amount)} ${ticker} + ${formatAmount(totalFees)} NXS`;
+    document.getElementById('modal-total').textContent = `${formatAmount(amount)} ${ticker} + ${formatAmount(nexusFee)} NXS`;
   }
   
   // Show/hide reference row

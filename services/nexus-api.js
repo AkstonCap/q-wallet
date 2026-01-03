@@ -320,10 +320,11 @@ class NexusAPI {
           // Look for matching debit transactions
           for (const tx of transactions) {
 
-            // Check timestamp
+            // Check timestamp - if this tx is too old, all remaining are too (sorted desc)
+            // Break to check next account, don't return yet
             const txTimestamp = tx.timestamp || 0;
             if (txTimestamp < cutoffTime) {
-              return { hasPaid: false, accountName: null, txid: null, timestamp: null }; // Too old
+              break; // Move to next account
             }
 
             for (const contract of tx.contracts || []) {

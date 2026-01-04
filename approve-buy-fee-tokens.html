@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Buy Fee Tokens</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .header {
+      background: linear-gradient(135deg, #ff6600, #cc5200);
+      color: white;
+      padding: 16px;
+      text-align: center;
+    }
+    
+    .header h1 {
+      font-size: 18px;
+      margin-bottom: 5px;
+    }
+    
+    .content {
+      flex: 1;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+    
+    .info-box {
+      background: #e7f3ff;
+      border: 2px solid #2196F3;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    
+    .info-title {
+      font-weight: 600;
+      font-size: 14px;
+      color: #1565C0;
+      margin-bottom: 8px;
+    }
+    
+    .info-text {
+      font-size: 13px;
+      color: #333;
+    }
+    
+    .fee-required {
+      font-weight: 600;
+      color: #ff6600;
+      font-size: 16px;
+      margin: 8px 0;
+    }
+    
+    .section-title {
+      font-weight: 600;
+      font-size: 14px;
+      color: #333;
+      margin: 16px 0 8px 0;
+    }
+    
+    .ask-option {
+      background: #f5f5f5;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .ask-option:hover {
+      border-color: #ff6600;
+      background: #fff5e6;
+    }
+    
+    .ask-option.selected {
+      border-color: #ff6600;
+      background: #fff5e6;
+    }
+    
+    .ask-option.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .ask-option.disabled:hover {
+      border-color: #ddd;
+      background: #f5f5f5;
+    }
+    
+    .ask-label {
+      font-weight: 600;
+      font-size: 13px;
+      color: #333;
+      margin-bottom: 8px;
+    }
+    
+    .ask-details {
+      font-size: 12px;
+      color: #666;
+    }
+    
+    .ask-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 4px 0;
+    }
+    
+    .ask-value {
+      font-weight: 500;
+      color: #333;
+    }
+    
+    .ask-price {
+      font-size: 14px;
+      font-weight: 600;
+      color: #28a745;
+      margin-top: 8px;
+    }
+    
+    .no-asks {
+      text-align: center;
+      color: #666;
+      font-style: italic;
+      padding: 20px;
+    }
+    
+    .pin-section {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #ddd;
+    }
+    
+    .account-selector {
+      margin-top: 12px;
+    }
+    
+    .account-selector label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #666;
+      margin-bottom: 6px;
+    }
+    
+    .account-selector select {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 13px;
+      background: white;
+    }
+    
+    .pin-input {
+      margin-top: 12px;
+    }
+    
+    .pin-input label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #666;
+      margin-bottom: 6px;
+    }
+    
+    .pin-input input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      font-family: monospace;
+    }
+    
+    .buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #ddd;
+    }
+    
+    button {
+      flex: 1;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .btn-buy {
+      background: #28a745;
+      color: white;
+    }
+    
+    .btn-buy:hover:not(:disabled) {
+      background: #218838;
+    }
+    
+    .btn-buy:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    
+    .btn-cancel {
+      background: #dc3545;
+      color: white;
+    }
+    
+    .btn-cancel:hover {
+      background: #c82333;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 20px;
+      color: #666;
+    }
+    
+    .loading-spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #ff6600;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .result-box {
+      padding: 16px;
+      border-radius: 8px;
+      margin-top: 16px;
+      text-align: center;
+    }
+    
+    .result-success {
+      background: #d4edda;
+      border: 2px solid #28a745;
+      color: #155724;
+    }
+    
+    .result-error {
+      background: #f8d7da;
+      border: 2px solid #dc3545;
+      color: #721c24;
+    }
+    
+    .result-title {
+      font-weight: 600;
+      font-size: 16px;
+      margin-bottom: 8px;
+    }
+    
+    .result-message {
+      font-size: 13px;
+    }
+    
+    .retry-notice {
+      background: #fff3cd;
+      border: 2px solid #ffc107;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 16px;
+      text-align: center;
+      font-size: 13px;
+      color: #856404;
+    }
+    
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>💱 Buy Fee Tokens</h1>
+  </div>
+  
+  <div class="content">
+    <!-- Info section -->
+    <div class="info-box">
+      <div class="info-title">Insufficient Balance for Connection Fee</div>
+      <div class="info-text">
+        You need <span class="fee-required" id="fee-required">-</span> to connect to this dApp.
+        <br>Purchase tokens from the on-chain market below.
+      </div>
+    </div>
+    
+    <!-- Loading state -->
+    <div id="loading-section" class="loading">
+      <span class="loading-spinner"></span>
+      Loading market orders...
+    </div>
+    
+    <!-- Ask options -->
+    <div id="asks-section" class="hidden">
+      <div class="section-title">Choose an offer:</div>
+      
+      <!-- Option 1: Exact/lowest amount at best price -->
+      <div id="option-exact" class="ask-option hidden">
+        <div class="ask-label">🎯 Best Match (Exact Amount)</div>
+        <div class="ask-details">
+          <div class="ask-row">
+            <span>You receive:</span>
+            <span class="ask-value" id="exact-amount">-</span>
+          </div>
+          <div class="ask-row">
+            <span>You pay:</span>
+            <span class="ask-value" id="exact-cost">-</span>
+          </div>
+        </div>
+        <div class="ask-price">Price: <span id="exact-price">-</span></div>
+      </div>
+      
+      <!-- Option 2: Lowest price -->
+      <div id="option-cheapest" class="ask-option hidden">
+        <div class="ask-label">💰 Lowest Price</div>
+        <div class="ask-details">
+          <div class="ask-row">
+            <span>You receive:</span>
+            <span class="ask-value" id="cheapest-amount">-</span>
+          </div>
+          <div class="ask-row">
+            <span>You pay:</span>
+            <span class="ask-value" id="cheapest-cost">-</span>
+          </div>
+        </div>
+        <div class="ask-price">Price: <span id="cheapest-price">-</span></div>
+      </div>
+      
+      <div id="no-asks" class="no-asks hidden">
+        No suitable offers available in the market.
+        <br>Please try again later.
+      </div>
+      
+      <!-- Account selection and PIN input -->
+      <div id="pin-section" class="pin-section hidden">
+        <div class="account-selector">
+          <label for="from-account">Pay from (NXS account):</label>
+          <select id="from-account">
+            <option value="">Loading accounts...</option>
+          </select>
+        </div>
+        <div class="account-selector">
+          <label for="to-account">Receive to (<span id="to-account-token">token</span> account):</label>
+          <select id="to-account">
+            <option value="">Loading accounts...</option>
+          </select>
+        </div>
+        <div class="pin-input">
+          <label for="buy-pin">Enter PIN to confirm purchase:</label>
+          <input type="password" id="buy-pin" placeholder="Enter your PIN" maxlength="8" />
+        </div>
+      </div>
+    </div>
+    
+    <!-- Result section -->
+    <div id="result-section" class="hidden">
+      <div id="result-box" class="result-box">
+        <div class="result-title" id="result-title">-</div>
+        <div class="result-message" id="result-message">-</div>
+      </div>
+      <div id="retry-notice" class="retry-notice hidden">
+        ⏱️ Please wait approximately 1 minute for the transaction to confirm on-chain, then retry the connection.
+      </div>
+    </div>
+    
+    <!-- Buttons -->
+    <div class="buttons">
+      <button class="btn-cancel" id="cancel-btn">Cancel</button>
+      <button class="btn-buy" id="buy-btn" disabled>Buy Tokens</button>
+    </div>
+  </div>
+  
+  <script src="approve-buy-fee-tokens.js"></script>
+</body>
+</html>

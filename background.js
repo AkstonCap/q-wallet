@@ -7,6 +7,7 @@ importScripts('lib/logger.js', 'services/nexus-api.js', 'services/storage.js', '
 let wallet;
 const pendingApprovals = new Map(); // Store pending connection approval requests
 const pendingTransactionApprovals = new Map(); // Store pending transaction approval requests
+const pendingBuyFeeTokens = new Map(); // Store pending buy fee tokens requests
 const recentTransactionRequests = new Map(); // Track recent transaction requests to prevent duplicates
 const recentConnectionRequests = new Map(); // Track recent connection requests to prevent duplicates
 
@@ -102,6 +103,65 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // Early return - don't process this message further
   }
   
+  // Handle buy fee tokens response
+  if (request.type === 'BUY_FEE_TOKENS_RESPONSE') {
+    const { requestId, purchased, txid, origin } = request;
+    Logger.debug('Buy fee tokens response:', purchased ? 'purchased' : 'cancelled', origin);
+    
+    const pending = pendingBuyFeeTokens.get(requestId);
+    if (pending) {
+      pending.resolve({
+        purchased,
+        txid: txid || null
+      });
+      pendingBuyFeeTokens.delete(requestId);
+      
+      // Only close the window if cancelled - if purchased, let user see the result
+      if (!purchased && pending.windowId) {
+        chrome.windows.remove(pending.windowId).catch(() => {});
+      }
+    }
+    
+    sendResponse({ success: true });
+    return true;
+  }
+  
+  // Handle open buy fee tokens request from connection window
+  if (request.type === 'OPEN_BUY_FEE_TOKENS') {
+    const { origin, fee, requestId: connectionRequestId } = request;
+    Logger.debug('Open buy fee tokens request:', origin, fee);
+    
+    // Reject the pending connection approval so the promise completes and cleans up
+    const pending = pendingApprovals.get(connectionRequestId);
+    if (pending) {
+      // Reject with a special error that indicates user is buying tokens
+      pending.reject(new Error('User redirected to buy fee tokens'));
+      pendingApprovals.delete(connectionRequestId);
+      
+      // Close the connection approval window
+      if (pending.windowId) {
+        chrome.windows.remove(pending.windowId).catch(() => {});
+      }
+    }
+    
+    // Open the buy fee tokens modal
+    requestBuyFeeTokens(origin, fee)
+      .then(result => {
+        if (result.purchased) {
+          Logger.info('Fee tokens purchased successfully:', result.txid);
+          // User bought tokens - they need to retry connection after confirmation
+        } else {
+          Logger.debug('Buy fee tokens cancelled');
+        }
+      })
+      .catch(error => {
+        Logger.error('Buy fee tokens failed:', error.message);
+      });
+    
+    sendResponse({ success: true });
+    return true;
+  }
+  
   // Handle normal messages (only if not already handled above)
   handleMessage(request, sender)
     .then(sendResponse)
@@ -188,6 +248,25 @@ async function handleMessage(request, sender) {
     case 'settings.setNodeUrl':
       await wallet.updateNodeUrl(params.url);
       return { result: true };
+
+    // Market API
+    case 'market.listAsks':
+      if (!wallet.isLoggedIn()) {
+        throw new Error('Wallet not connected');
+      }
+      return { result: await wallet.api.listMarketAsks(params.market) };
+    
+    case 'market.executeOrder':
+      if (!wallet.isLoggedIn()) {
+        throw new Error('Wallet not connected');
+      }
+      return { result: await wallet.api.executeMarketOrder(
+        params.txid, 
+        params.pin, 
+        wallet.session,
+        params.from || null,
+        params.to || null
+      ) };
 
     // DApp connections (for web3 provider)
     case 'dapp.requestConnection':
@@ -414,13 +493,28 @@ async function handleDAppConnectionWithFee(sender, params) {
 
   const storage = new StorageService();
   
-  // Check if domain is blocked
+  // Step 1: Check if domain is blocked
   const isBlocked = await storage.isDomainBlocked(identifier);
   if (isBlocked) {
     throw new Error('This domain has been blocked from connecting to your wallet');
   }
 
-  // Check if user has already paid within the validity window (on-chain verification)
+  // Step 1b: Check if already approved - connect directly
+  const isApproved = await storage.isDomainApproved(identifier);
+  if (isApproved) {
+    // Update activity timestamp
+    await storage.updateDomainActivity(identifier);
+    
+    const address = await wallet.getAccountAddress('default');
+    return {
+      result: {
+        connected: true,
+        accounts: [address]
+      }
+    };
+  }
+
+  // Step 2: Check if user has already paid within the validity window (on-chain verification)
   const paymentCheck = await wallet.api.checkConnectionFeePayment(
     wallet.session,
     fee.recipientAddress,
@@ -430,7 +524,10 @@ async function handleDAppConnectionWithFee(sender, params) {
   );
   
   if (paymentCheck.hasPaid) {
-    // Found existing payment - store it for tracking
+    // Step 2a: Found existing payment - redirect to free connection approval
+    Logger.debug('Existing fee payment found, redirecting to free approval');
+    
+    // Store it for tracking
     await storage.addPaidConnection(identifier, {
       tokenName: fee.tokenName,
       amount: fee.amount,
@@ -443,9 +540,9 @@ async function handleDAppConnectionWithFee(sender, params) {
     
     // Request user approval WITHOUT fee (free connection flow)
     const approved = await requestUserApproval(identifier);
-    const isApproved = typeof approved === 'boolean' ? approved : approved.approved;
+    const approvalResult = typeof approved === 'boolean' ? approved : approved.approved;
     
-    if (isApproved) {
+    if (approvalResult) {
       await storage.addApprovedDomain(identifier);
       await storage.updateDomainActivity(identifier);
       
@@ -463,7 +560,8 @@ async function handleDAppConnectionWithFee(sender, params) {
     }
   }
 
-  // Need to request payment - show approval with fee
+  // Step 2b: No existing payment - need to request payment
+  // Check if there's already a pending approval for this domain
   const pendingKey = `connection:${identifier}`;
   const existingPending = recentConnectionRequests.get(pendingKey);
   if (existingPending) {
@@ -629,6 +727,58 @@ async function requestUserApprovalWithFee(origin, fee) {
           chrome.windows.remove(window.id).catch(() => {});
         }
       }, 180000);
+    });
+  });
+}
+
+// Request user to buy fee tokens from market
+async function requestBuyFeeTokens(origin, fee) {
+  return new Promise((resolve, reject) => {
+    const requestId = Date.now().toString();
+    Logger.debug('Requesting buy fee tokens:', origin, fee);
+    
+    // Store the pending request
+    pendingBuyFeeTokens.set(requestId, { origin, fee, resolve, reject });
+    
+    // Create popup window for buying tokens
+    const width = 450;
+    const height = 600;
+    
+    const feeParam = encodeURIComponent(JSON.stringify(fee));
+    
+    chrome.windows.create({
+      url: `approve-buy-fee-tokens.html?origin=${encodeURIComponent(origin)}&requestId=${requestId}&fee=${feeParam}`,
+      type: 'popup',
+      width: width,
+      height: height,
+      focused: true
+    }, (window) => {
+      if (chrome.runtime.lastError) {
+        Logger.error('Failed to create buy tokens window:', chrome.runtime.lastError.message);
+        pendingBuyFeeTokens.delete(requestId);
+        reject(new Error('Unable to show buy tokens dialog'));
+        return;
+      }
+      
+      Logger.debug('Buy tokens window created for:', origin);
+      
+      // Store window ID with the request
+      const pending = pendingBuyFeeTokens.get(requestId);
+      if (pending) {
+        pending.windowId = window.id;
+      }
+      
+      // Add timeout - auto-cancel after 5 minutes
+      setTimeout(() => {
+        if (pendingBuyFeeTokens.has(requestId)) {
+          Logger.warn('Buy fee tokens request timed out:', origin);
+          pendingBuyFeeTokens.delete(requestId);
+          reject(new Error('Buy tokens request timed out'));
+          
+          // Close the window if still open
+          chrome.windows.remove(window.id).catch(() => {});
+        }
+      }, 300000);
     });
   });
 }

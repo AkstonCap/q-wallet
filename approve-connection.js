@@ -9,6 +9,7 @@ const feeParam = urlParams.get('fee');
 
 let feeConfig = null;
 let accounts = [];
+let hasSufficientBalance = false;
 
 // Display origin
 document.getElementById('origin-text').textContent = origin || 'Unknown';
@@ -63,12 +64,16 @@ async function loadAccountsForPayment() {
     const paymentAccountSelect = document.getElementById('payment-account');
     paymentAccountSelect.innerHTML = '<option value="">Select account...</option>';
     
+    let hasMatchingAccounts = false;
+    let hasAccountWithSufficientBalance = false;
+    
     for (const account of allAccounts) {
       const accountToken = account.ticker || '';
       const accountTokenAddress = account.token || '';
       
       // Only show accounts with matching token
       if (accountToken === feeConfig.tokenName || accountTokenAddress === feeConfig.tokenName) {
+        hasMatchingAccounts = true;
         const balance = parseFloat(account.balance || 0);
         const accountName = account.name || account.address;
         
@@ -80,6 +85,8 @@ async function loadAccountsForPayment() {
         if (balance < feeConfig.amount) {
           option.disabled = true;
           option.textContent += ' - Insufficient';
+        } else {
+          hasAccountWithSufficientBalance = true;
         }
         
         paymentAccountSelect.appendChild(option);
@@ -87,10 +94,17 @@ async function loadAccountsForPayment() {
       }
     }
     
+    hasSufficientBalance = hasAccountWithSufficientBalance;
+    
     // Update balance display on selection change
     paymentAccountSelect.addEventListener('change', updateBalanceDisplay);
     
-    // If no accounts found, show message
+    // Handle insufficient balance scenarios
+    if (!hasMatchingAccounts || !hasAccountWithSufficientBalance) {
+      showInsufficientBalanceOption();
+    }
+    
+    // If no accounts found at all, show message
     if (paymentAccountSelect.options.length === 1) {
       paymentAccountSelect.innerHTML = 
         `<option value="">No ${feeConfig.tokenName} accounts found</option>`;
@@ -100,6 +114,49 @@ async function loadAccountsForPayment() {
     console.error('Failed to load accounts:', error);
     document.getElementById('payment-account').innerHTML = 
       '<option value="">Error loading accounts</option>';
+  }
+}
+
+// Show insufficient balance option with buy tokens button
+function showInsufficientBalanceOption() {
+  // Only show buy tokens option if token is not NXS
+  if (feeConfig.tokenName === 'NXS') {
+    // For NXS, just disable approve button - can't buy NXS from market
+    document.getElementById('approve-btn').disabled = true;
+    return;
+  }
+  
+  // Show insufficient balance notice
+  const notice = document.getElementById('insufficient-balance-notice');
+  notice.style.display = 'block';
+  document.getElementById('insufficient-token').textContent = feeConfig.tokenName;
+  
+  // Hide PIN input since they can't pay yet
+  document.getElementById('pin-input-section').style.display = 'none';
+  
+  // Disable approve button
+  document.getElementById('approve-btn').disabled = true;
+  
+  // Setup buy tokens button handler
+  document.getElementById('buy-tokens-btn').addEventListener('click', handleBuyTokens);
+}
+
+// Handle buy tokens button click
+async function handleBuyTokens() {
+  try {
+    // Send message to background to open buy tokens modal
+    await chrome.runtime.sendMessage({
+      type: 'OPEN_BUY_FEE_TOKENS',
+      origin: origin,
+      fee: feeConfig,
+      requestId: requestId
+    });
+    
+    // Close this window - background will open the buy tokens modal
+    closeWindow();
+  } catch (error) {
+    console.error('Failed to open buy tokens:', error);
+    alert('Failed to open buy tokens dialog: ' + error.message);
   }
 }
 

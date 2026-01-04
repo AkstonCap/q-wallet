@@ -278,6 +278,36 @@ class NexusAPI {
     return this.request('system/get/info');
   }
 
+  // ===== MARKET API =====
+
+  // List market asks for a given market pair
+  // Returns array of ask orders
+  async listMarketAsks(market) {
+    const response = await this.request('market/list/ask', { market });
+    // API returns asks in the 'asks' property
+    const data = response.result || response;
+    return data.asks || data || [];
+  }
+
+  // Execute a market order by txid
+  // Requires PIN and optionally from/to accounts
+  async executeMarketOrder(txid, pin, session, fromAccount = null, toAccount = null) {
+    const params = {
+      txid,
+      pin,
+      session
+    };
+    
+    if (fromAccount) {
+      params.from = fromAccount;
+    }
+    if (toAccount) {
+      params.to = toAccount;
+    }
+    
+    return this.request('market/execute/order', params);
+  }
+
   // ===== CONNECTION FEE CHECKING =====
 
   // Check if user has paid connection fee within time window
@@ -285,15 +315,18 @@ class NexusAPI {
   async checkConnectionFeePayment(session, recipientAddress, tokenName, requiredAmount, timeWindowSeconds) {
     try {
       // Get all accounts for this session
-      const accountsResponse = await this.listAccounts(session);
-      const accounts = accountsResponse.result || [];
+      // listAccounts already extracts from response.result
+      const accounts = await this.listAccounts(session);
       
-      if (!accounts || accounts.length === 0) {
+      if (!accounts || !Array.isArray(accounts) || accounts.length === 0) {
+        console.log('checkConnectionFeePayment: No accounts found');
         return { hasPaid: false, accountName: null, txid: null, timestamp: null, confirmations: null };
       }
       
       const now = Math.floor(Date.now() / 1000); // Current time in seconds
       const cutoffTime = now - timeWindowSeconds;
+      
+      console.log('checkConnectionFeePayment: Checking', accounts.length, 'accounts for', tokenName, 'payments to', recipientAddress);
       
       // Check each account's transaction history
       for (const account of accounts) {
@@ -304,6 +337,8 @@ class NexusAPI {
         if (accountToken !== tokenName) {
           continue;
         }
+        
+        console.log('checkConnectionFeePayment: Checking account', accountName, 'with token', accountToken);
         
         try {
           // Get transaction history for this account
@@ -316,6 +351,7 @@ class NexusAPI {
           });
           
           const transactions = txResponse.result || [];
+          console.log('checkConnectionFeePayment: Found', transactions.length, 'transactions for', accountName);
           
           // Look for matching debit transactions
           for (const tx of transactions) {
@@ -324,6 +360,7 @@ class NexusAPI {
             // Break to check next account, don't return yet
             const txTimestamp = tx.timestamp || 0;
             if (txTimestamp < cutoffTime) {
+              console.log('checkConnectionFeePayment: Transaction too old, breaking');
               break; // Move to next account
             }
 
@@ -336,6 +373,8 @@ class NexusAPI {
               // Check recipient matches
               const txRecipientAddress = contract.to?.address || '';
               const txRecipientName = contract.to?.name || '';
+              console.log('checkConnectionFeePayment: DEBIT found to', txRecipientAddress || txRecipientName, 'amount', contract.amount);
+              
               if (txRecipientAddress !== recipientAddress && txRecipientName !== recipientAddress) {
                 continue;
               }
@@ -343,6 +382,7 @@ class NexusAPI {
               // Check amount matches or exceeds required
               const txAmount = parseFloat(contract.amount || 0);
               if (txAmount >= requiredAmount) {
+                console.log('checkConnectionFeePayment: Found matching payment!', tx.txid);
                 return {
                   hasPaid: true,
                   accountName: accountName,
@@ -360,6 +400,7 @@ class NexusAPI {
         }
       }
       
+      console.log('checkConnectionFeePayment: No matching payment found');
       return { hasPaid: false, accountName: null, txid: null, timestamp: null };
     } catch (error) {
       console.error('Error checking connection fee payment:', error);

@@ -240,7 +240,11 @@
     <!-- Batch API Calls Section -->
     <div class="section">
       <h3>8. Execute Batch API Calls</h3>
-      <p>Execute multiple API calls with a single approval (2x market/create/bid)</p>
+      <p>Execute multiple API calls with a single approval</p>
+      <p style="color: #666; font-size: 14px;"><strong>Example 1:</strong> Create Assets (requires 'format' parameter)</p>
+      <button id="batch-call-assets-btn" onclick="executeBatchAssetCreation()" disabled style="background: #6610f2;">Create 2 Test Assets</button>
+      
+      <p style="color: #666; font-size: 14px; margin-top: 20px;"><strong>Example 2:</strong> Market Orders (2x market/create/bid)</p>
       <input type="text" id="batch-call-market-1" placeholder="Call 1: Market pair (e.g., NXS/USDD)">
       <input type="text" id="batch-call-from-1" placeholder="Call 1: Payment account">
       <input type="text" id="batch-call-to-1" placeholder="Call 1: Receival account">
@@ -252,7 +256,7 @@
       <input type="text" id="batch-call-to-2" placeholder="Call 2: Receival account">
       <input type="number" id="batch-call-price-2" placeholder="Call 2: Price" step="0.01" min="0">
       <input type="number" id="batch-call-amount-2" placeholder="Call 2: Amount" step="0.01" min="0">
-      <button id="batch-call-btn" onclick="executeBatchApiCalls()" disabled>Execute Batch Calls</button>
+      <button id="batch-call-btn" onclick="executeBatchApiCalls()" disabled>Execute Market Orders</button>
       
       <div id="batch-call-result" style="display: none;">
         <div class="label">Batch API Result:</div>
@@ -355,6 +359,7 @@ if (typeof window.nexus !== 'undefined') {
           document.getElementById('history-btn').disabled = false;
           document.getElementById('batch-tx-btn').disabled = false;
           document.getElementById('batch-call-btn').disabled = false;
+          document.getElementById('batch-call-assets-btn').disabled = false;
         } else {
           updateStatus('No accounts found. Please log in to your wallet.', 'error');
         }
@@ -404,6 +409,7 @@ if (typeof window.nexus !== 'undefined') {
           document.getElementById('history-btn').disabled = false;
           document.getElementById('batch-tx-btn').disabled = false;
           document.getElementById('batch-call-btn').disabled = false;
+          document.getElementById('batch-call-assets-btn').disabled = false;
         } else {
           updateStatus('No accounts found. Please log in to your wallet.', 'error');
         }
@@ -711,6 +717,37 @@ if (typeof window.nexus !== 'undefined') {
       } catch (error) {
         console.error('Batch transactions failed:', error);
         updateStatus('Batch transactions failed: ' + error.message, 'error');
+      }
+    }
+
+    // Execute batch asset creation - demonstrates proper format parameter usage
+    async function executeBatchAssetCreation() {
+      try {
+        updateStatus('Creating test assets...', '');
+        
+        // IMPORTANT: When creating assets, you MUST include the 'format' parameter
+        // Supported formats: 'basic', 'JSON', 'raw', 'readonly'
+        const calls = [
+          {
+            endpoint: 'assets/create/asset',
+            params: {
+              name: 'test_asset_' + Date.now(),
+              format: 'basic',  // REQUIRED: format parameter
+              title: 'Test Asset 1',
+              description: 'Created via batch API call',
+              category: 'test'
+            }
+          }
+        ];
+
+        const result = await window.nexus.executeBatchCalls(calls);
+
+        document.getElementById('batch-call-data').textContent = JSON.stringify(result, null, 2);
+        document.getElementById('batch-call-result').style.display = 'block';
+        updateStatus('Assets created successfully!', 'connected');
+      } catch (error) {
+        console.error('Batch asset creation failed:', error);
+        updateStatus('Asset creation failed: ' + error.message, 'error');
       }
     }
 

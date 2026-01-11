@@ -740,7 +740,7 @@ if (typeof window.qWallet !== 'undefined') {
           }
         ];
 
-        const result = await window.nexus.executeBatchCalls(calls);
+        const result = await window.qWallet.executeBatchCalls(calls);
 
         document.getElementById('batch-call-data').textContent = JSON.stringify(result, null, 2);
         document.getElementById('batch-call-result').style.display = 'block';

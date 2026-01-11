@@ -16,7 +16,7 @@ This guide will help you integrate Q-Wallet into your decentralized application 
 
 ```javascript
 // Check if Q-Wallet is installed
-if (typeof window.nexus === 'undefined') {
+if (typeof window.qWallet === 'undefined') {
   alert('Please install Q-Wallet extension');
   // Show installation instructions
   return;
@@ -28,7 +28,7 @@ if (typeof window.nexus === 'undefined') {
 ```javascript
 async function connectWallet() {
   try {
-    const accounts = await window.nexus.connect();
+    const accounts = await window.qWallet.connect();
     console.log('Connected to account:', accounts[0]);
     return accounts[0];
   } catch (error) {
@@ -43,7 +43,7 @@ async function connectWallet() {
 ```javascript
 async function checkBalance() {
   try {
-    const balance = await window.nexus.getBalance('default');
+    const balance = await window.qWallet.getBalance('default');
     console.log('Balance:', balance, 'NXS');
     return balance;
   } catch (error) {
@@ -58,7 +58,7 @@ async function checkBalance() {
 ```javascript
 async function sendNXS(recipient, amount) {
   try {
-    const result = await window.nexus.sendTransaction({
+    const result = await window.qWallet.sendTransaction({
       from: 'default',
       to: recipient,
       amount: amount,
@@ -112,13 +112,13 @@ Here's a complete minimal dApp:
 
     // Initialize
     window.addEventListener('load', async () => {
-      if (typeof window.nexus === 'undefined') {
+      if (typeof window.qWallet === 'undefined') {
         alert('Please install Q-Wallet');
         return;
       }
 
       // Check if already connected
-      const accounts = await window.nexus.getAccounts();
+      const accounts = await window.qWallet.getAccounts();
       if (accounts.length > 0) {
         onConnected(accounts[0]);
       }
@@ -126,7 +126,7 @@ Here's a complete minimal dApp:
       // Connect button
       document.getElementById('connectBtn').onclick = async () => {
         try {
-          const accounts = await window.nexus.connect();
+          const accounts = await window.qWallet.connect();
           onConnected(accounts[0]);
         } catch (error) {
           alert('Connection denied');
@@ -144,7 +144,7 @@ Here's a complete minimal dApp:
       document.getElementById('account').textContent = account;
       
       // Get balance
-      const balance = await window.nexus.getBalance('default');
+      const balance = await window.qWallet.getBalance('default');
       document.getElementById('balance').textContent = balance;
     }
 
@@ -158,7 +158,7 @@ Here's a complete minimal dApp:
       }
 
       try {
-        const result = await window.nexus.sendTransaction({
+        const result = await window.qWallet.sendTransaction({
           from: 'default',
           to: recipient,
           amount: amount,
@@ -176,28 +176,28 @@ Here's a complete minimal dApp:
 
 ## API Reference
 
-### window.nexus.connect()
+### window.qWallet.connect()
 Request connection to user's wallet. Shows approval popup.
 
 **Returns:** `Promise<string[]>` - Array with account address/name
 
 **Example:**
 ```javascript
-const accounts = await window.nexus.connect();
+const accounts = await window.qWallet.connect();
 ```
 
-### window.nexus.getAccounts()
+### window.qWallet.getAccounts()
 Get connected accounts without showing popup.
 
 **Returns:** `Promise<string[]>` - Array of accounts, or empty if not connected
 
 **Example:**
 ```javascript
-const accounts = await window.nexus.getAccounts();
+const accounts = await window.qWallet.getAccounts();
 const isConnected = accounts.length > 0;
 ```
 
-### window.nexus.getBalance(account?)
+### window.qWallet.getBalance(account?)
 Get account balance in NXS.
 
 **Parameters:**
@@ -207,10 +207,10 @@ Get account balance in NXS.
 
 **Example:**
 ```javascript
-const balance = await window.nexus.getBalance('default');
+const balance = await window.qWallet.getBalance('default');
 ```
 
-### window.nexus.sendTransaction(params)
+### window.qWallet.sendTransaction(params)
 Send NXS transaction (requires user PIN approval).
 
 **Parameters:**
@@ -227,7 +227,7 @@ Send NXS transaction (requires user PIN approval).
 
 **Example:**
 ```javascript
-const result = await window.nexus.sendTransaction({
+const result = await window.qWallet.sendTransaction({
   from: 'default',
   to: 'recipient_address',
   amount: 10.5,
@@ -235,7 +235,7 @@ const result = await window.nexus.sendTransaction({
 });
 ```
 
-### window.nexus.getTransactionHistory(limit?)
+### window.qWallet.getTransactionHistory(limit?)
 Get transaction history for connected account.
 
 **Parameters:**
@@ -245,18 +245,18 @@ Get transaction history for connected account.
 
 **Example:**
 ```javascript
-const txs = await window.nexus.getTransactionHistory(10);
+const txs = await window.qWallet.getTransactionHistory(10);
 txs.forEach(tx => console.log(tx.amount, 'NXS'));
 ```
 
-### window.nexus.isWalletConnected()
+### window.qWallet.isWalletConnected()
 Check if wallet is connected.
 
 **Returns:** `Promise<boolean>`
 
 **Example:**
 ```javascript
-const connected = await window.nexus.isWalletConnected();
+const connected = await window.qWallet.isWalletConnected();
 ```
 
 ## Common Patterns
@@ -265,12 +265,12 @@ const connected = await window.nexus.isWalletConnected();
 
 ```javascript
 window.addEventListener('load', async () => {
-  if (typeof window.nexus === 'undefined') {
+  if (typeof window.qWallet === 'undefined') {
     showInstallPrompt();
     return;
   }
 
-  const accounts = await window.nexus.getAccounts();
+  const accounts = await window.qWallet.getAccounts();
   if (accounts.length > 0) {
     initializeApp(accounts[0]);
   } else {
@@ -285,7 +285,7 @@ window.addEventListener('load', async () => {
 let isConnected = false;
 
 async function checkConnection() {
-  const accounts = await window.nexus.getAccounts();
+  const accounts = await window.qWallet.getAccounts();
   isConnected = accounts.length > 0;
   
   if (isConnected) {
@@ -318,7 +318,7 @@ async function sendTransaction() {
   }
 
   // Get current balance
-  const balance = await window.nexus.getBalance('default');
+  const balance = await window.qWallet.getBalance('default');
   if (amount > balance) {
     showError('Insufficient balance');
     return;
@@ -326,7 +326,7 @@ async function sendTransaction() {
 
   // Send
   try {
-    await window.nexus.sendTransaction({
+    await window.qWallet.sendTransaction({
       from: 'default',
       to: recipient,
       amount: amount
@@ -347,7 +347,7 @@ async function sendWithProgress(recipient, amount) {
   try {
     progressDiv.textContent = 'Requesting approval...';
     
-    const result = await window.nexus.sendTransaction({
+    const result = await window.qWallet.sendTransaction({
       from: 'default',
       to: recipient,
       amount: amount
@@ -369,7 +369,7 @@ async function sendWithProgress(recipient, amount) {
 
 ```javascript
 try {
-  await window.nexus.connect();
+  await window.qWallet.connect();
 } catch (error) {
   if (error.message.includes('denied')) {
     // User clicked "Deny"
@@ -387,7 +387,7 @@ try {
 
 ```javascript
 try {
-  await window.nexus.sendTransaction({...});
+  await window.qWallet.sendTransaction({...});
 } catch (error) {
   if (error.message.includes('denied')) {
     // User cancelled transaction
@@ -497,7 +497,7 @@ async function purchaseItem(itemId) {
   const item = products[itemId];
   
   try {
-    const result = await window.nexus.sendTransaction({
+    const result = await window.qWallet.sendTransaction({
       from: 'default',
       to: 'YOUR_MERCHANT_ADDRESS',
       amount: item.price,
@@ -516,13 +516,13 @@ async function purchaseItem(itemId) {
 
 ```javascript
 async function donate(amount) {
-  if (typeof window.nexus === 'undefined') {
+  if (typeof window.qWallet === 'undefined') {
     alert('Install Q-Wallet to donate');
     return;
   }
 
   try {
-    await window.nexus.sendTransaction({
+    await window.qWallet.sendTransaction({
       from: 'default',
       to: 'DONATION_ADDRESS',
       amount: amount,
@@ -540,16 +540,16 @@ async function donate(amount) {
 
 ```javascript
 async function showWalletBalance() {
-  if (typeof window.nexus === 'undefined') {
+  if (typeof window.qWallet === 'undefined') {
     return;
   }
 
-  const accounts = await window.nexus.getAccounts();
+  const accounts = await window.qWallet.getAccounts();
   if (accounts.length === 0) {
     return; // Not connected
   }
 
-  const balance = await window.nexus.getBalance('default');
+  const balance = await window.qWallet.getBalance('default');
   document.getElementById('balance').textContent = `${balance} NXS`;
 }
 ```

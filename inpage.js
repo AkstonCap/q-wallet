@@ -1,5 +1,5 @@
 // Inpage Script
-// Provides the window.nexus object for dApps (similar to window.ethereum for MetaMask)
+// Provides the window.qWallet object for dApps (similar to window.ethereum for MetaMask)
 
 (function() {
   'use strict';
@@ -28,22 +28,22 @@
     },
     
     debug(...args) {
-      if (this.DEBUG) console.debug('[Nexus Provider]', ...this._processArgs(...args));
+      if (this.DEBUG) console.debug('[Q-Wallet Provider]', ...this._processArgs(...args));
     },
     info(...args) {
-      console.info('[Nexus Provider]', ...this._processArgs(...args));
+      console.info('[Q-Wallet Provider]', ...this._processArgs(...args));
     },
     error(...args) {
-      console.error('[Nexus Provider]', ...this._processArgs(...args));
+      console.error('[Q-Wallet Provider]', ...this._processArgs(...args));
     }
   };
 
   // Guard against multiple injections
-  if (window.__NEXUS_WALLET_PROVIDER_INJECTED__) {
+  if (window.__QWALLET_PROVIDER_INJECTED__) {
     Logger.debug('Provider already injected, skipping');
     return;
   }
-  window.__NEXUS_WALLET_PROVIDER_INJECTED__ = true;
+  window.__QWALLET_PROVIDER_INJECTED__ = true;
 
   // Create Nexus Provider
   class NexusProvider {
@@ -353,22 +353,22 @@
   // Inject provider into window
   const nexusProvider = new NexusProvider();
   
+  Object.defineProperty(window, 'qWallet', {
+    value: nexusProvider,
+    writable: false,
+    configurable: false
+  });
+
+  // Also set as window.nexus for backward compatibility
   Object.defineProperty(window, 'nexus', {
     value: nexusProvider,
     writable: false,
     configurable: false
   });
 
-  // Also set as window.nexusWallet for clarity
-  Object.defineProperty(window, 'nexusWallet', {
-    value: nexusProvider,
-    writable: false,
-    configurable: false
-  });
-
   // Announce provider availability
-  window.dispatchEvent(new Event('nexus#initialized'));
+  window.dispatchEvent(new Event('qWallet#initialized'));
 
   Logger.info('Provider injected successfully');
-  Logger.debug('Access via window.nexus or window.nexusWallet');
+  Logger.debug('Access via window.qWallet');
 })();

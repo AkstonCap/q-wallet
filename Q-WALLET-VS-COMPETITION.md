@@ -94,7 +94,7 @@ Q-Wallet is a next-generation cryptocurrency wallet built for the quantum era. U
 ### Q-Wallet
 
 **Developer-Friendly:**
-- ✅ **MetaMask-Style API**: Familiar `window.nexus` object
+- ✅ **MetaMask-Style API**: Familiar `window.qWallet` object
 - ✅ **Simple Connection Flow**: One-line wallet connection
 - ✅ **Clear Permission Model**: Approval popup for first connection
 - ✅ **No Setup Required**: Works out of the box with example dApp included
@@ -103,12 +103,12 @@ Q-Wallet is a next-generation cryptocurrency wallet built for the quantum era. U
 **Code Example:**
 ```javascript
 // Check if wallet installed
-if (window.nexus) {
+if (window.qWallet) {
   // Connect wallet
-  const accounts = await window.nexus.connect();
+  const accounts = await window.qWallet.connect();
   
   // Send transaction
-  const tx = await window.nexus.sendTransaction({
+  const tx = await window.qWallet.sendTransaction({
     to: 'recipient_address',
     amount: 10
   });

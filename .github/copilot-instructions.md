@@ -9,7 +9,7 @@ Distordia Q-Wallet is a Chrome/Firefox browser extension providing a secure cryp
 - **background.js**: Service worker, central message hub, manages wallet state and dApp connections
 - **popup.js/popup.html**: Main UI, sends messages to background for wallet operations
 - **content.js**: Injected into all web pages, bridges between webpage and extension
-- **inpage.js**: Injected into page context, provides `window.nexus` API for dApps
+- **inpage.js**: Injected into page context, provides `window.qWallet` API for dApps (with `window.nexus` alias for backward compatibility)
 - **approve-*.html/js**: Modal windows for transaction/connection approvals
 
 Message flow: `dApp → inpage.js → content.js → background.js → Nexus API`
@@ -46,7 +46,7 @@ Examples:
 Responses: `{result: ...}` or `{error: 'message'}`
 
 ### dApp Connection Flow
-1. dApp calls `window.nexus.connect()` (inpage.js)
+1. dApp calls `window.qWallet.connect()` (inpage.js)
 2. Message passes through content.js → background.js → `handleDAppConnection()`
 3. background.js opens approval window (`approve-connection.html`)
 4. User approves/denies → response stored in `pendingApprovals` Map

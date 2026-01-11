@@ -265,25 +265,25 @@
       <h3>Developer Reference</h3>
       <p>Example code to integrate Nexus Wallet in your dApp:</p>
       <pre style="background: #f8f9fa; padding: 15px; border-radius: 6px; overflow-x: auto;"><code>// Check if wallet is available
-if (typeof window.nexus !== 'undefined') {
+if (typeof window.qWallet !== 'undefined') {
   // Connect to wallet
-  const accounts = await window.nexus.connect();
+  const accounts = await window.qWallet.connect();
   console.log('Connected:', accounts[0]);
   
   // Get all connected accounts
-  const allAccounts = await window.nexus.getAccounts();
+  const allAccounts = await window.qWallet.getAccounts();
   console.log('All accounts:', allAccounts);
   
   // List all user accounts (including token accounts)
-  const userAccounts = await window.nexus.listAccounts();
+  const userAccounts = await window.qWallet.listAccounts();
   console.log('User accounts:', userAccounts);
   
   // Get balance
-  const balance = await window.nexus.getBalance();
+  const balance = await window.qWallet.getBalance();
   console.log('Balance:', balance);
   
   // Send transaction
-  const tx = await window.nexus.sendTransaction({
+  const tx = await window.qWallet.sendTransaction({
     to: 'recipient-address',
     amount: 10.5,
     reference: 'Payment'
@@ -298,11 +298,11 @@ if (typeof window.nexus !== 'undefined') {
 
     // Check if Nexus Wallet is installed
     async function checkWalletInstalled() {
-      if (typeof window.nexus === 'undefined') {
-        updateStatus('Nexus Wallet not detected! Please install the extension.', 'error');
+      if (typeof window.qWallet === 'undefined') {
+        updateStatus('Q-Wallet not detected! Please install the extension.', 'error');
         return false;
       }
-      updateStatus('Nexus Wallet detected!', 'connected');
+      updateStatus('Q-Wallet detected!', 'connected');
       return true;
     }
 
@@ -311,7 +311,7 @@ if (typeof window.nexus !== 'undefined') {
       try {
         if (!await checkWalletInstalled()) return false;
         
-        const isLoggedIn = await window.nexus.isLoggedIn();
+        const isLoggedIn = await window.qWallet.isLoggedIn();
         if (isLoggedIn) {
           updateStatus('✓ Q-Wallet is logged in. Ready to connect!', 'connected');
         } else {
@@ -331,7 +331,7 @@ if (typeof window.nexus !== 'undefined') {
         if (!await checkWalletInstalled()) return;
 
         updateStatus('Connecting to wallet...', '');
-        const accounts = await window.nexus.connect()   
+        const accounts = await window.qWallet.connect()   
         if (accounts && accounts.length > 0) {
           connectedAccount = accounts[0];
           updateStatus('Connected to wallet!', 'connected');
@@ -380,7 +380,7 @@ if (typeof window.nexus !== 'undefined') {
           validitySeconds: 12 * 60 * 60 // 12 hours
         };
         
-        const accounts = await window.nexus.connectWithFee(feeConfig);
+        const accounts = await window.qWallet.connectWithFee(feeConfig);
         
         if (accounts && accounts.length > 0) {
           connectedAccount = accounts[0];
@@ -417,7 +417,7 @@ if (typeof window.nexus !== 'undefined') {
     async function disconnectWallet() {
       try {
         // Call the wallet API to disconnect
-        await window.nexus.disconnect();
+        await window.qWallet.disconnect();
         
         connectedAccount = null;
         
@@ -455,9 +455,9 @@ if (typeof window.nexus !== 'undefined') {
       try {
         if (!await checkWalletInstalled()) return;
 
-        const isConnected = await window.nexus.isWalletConnected();
+        const isConnected = await window.qWallet.isWalletConnected();
         if (isConnected) {
-          const accounts = await window.nexus.getAccounts();
+          const accounts = await window.qWallet.getAccounts();
           connectedAccount = accounts[0];
           updateStatus('Wallet is connected!', 'connected');
           document.getElementById('account-address').textContent = connectedAccount;
@@ -489,7 +489,7 @@ if (typeof window.nexus !== 'undefined') {
     // Get accounts
     async function getAccounts() {
       try {
-        const accounts = await window.nexus.getAccounts();
+        const accounts = await window.qWallet.getAccounts();
         console.log('getAccounts response:', accounts);
         
         const accountsList = document.getElementById('accounts-list');
@@ -518,7 +518,7 @@ if (typeof window.nexus !== 'undefined') {
     // List all accounts for logged in user
     async function listAllAccounts() {
       try {
-        const accounts = await window.nexus.listAccounts();
+        const accounts = await window.qWallet.listAccounts();
         console.log('listAccounts response:', accounts);
         
         const accountsList = document.getElementById('list-accounts-list');
@@ -560,7 +560,7 @@ if (typeof window.nexus !== 'undefined') {
     // Get balances
     async function getBalances() {
       try {
-        const response = await window.nexus.getAllBalances();
+        const response = await window.qWallet.getAllBalances();
         console.log('getAllBalances response:', response);
         
         // Extract balances array from response
@@ -609,7 +609,7 @@ if (typeof window.nexus !== 'undefined') {
 
         updateStatus('Sending transaction...', '');
         
-        const result = await window.nexus.sendTransaction({
+        const result = await window.qWallet.sendTransaction({
           to: to,
           amount: amount,
           reference: reference
@@ -632,7 +632,7 @@ if (typeof window.nexus !== 'undefined') {
     // Get transaction history
     async function getHistory() {
       try {
-        const transactions = await window.nexus.getTransactionHistory(10);
+        const transactions = await window.qWallet.getTransactionHistory(10);
         const historyList = document.getElementById('history-list');
         
         if (!transactions || transactions.length === 0) {
@@ -695,7 +695,7 @@ if (typeof window.nexus !== 'undefined') {
           }
         ];
 
-        const result = await window.nexus.sendBatchTransactions(transactions);
+        const result = await window.qWallet.sendBatchTransactions(transactions);
 
         document.getElementById('batch-tx-data').textContent = JSON.stringify(result, null, 2);
         document.getElementById('batch-tx-result').style.display = 'block';
@@ -759,7 +759,7 @@ if (typeof window.nexus !== 'undefined') {
           }
         ];
 
-        const result = await window.nexus.executeBatchCalls(calls);
+        const result = await window.qWallet.executeBatchCalls(calls);
 
         document.getElementById('batch-call-data').textContent = JSON.stringify(result, null, 2);
         document.getElementById('batch-call-result').style.display = 'block';

@@ -55,7 +55,7 @@ When `DEBUG = true` (development only):
 
 **inpage.js:**
 - Inline logger with redaction
-- Protects window.nexus API calls
+- Protects window.qWallet API calls
 - No sensitive data exposed to web pages
 
 **services/wallet.js:**

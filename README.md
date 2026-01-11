@@ -17,7 +17,7 @@ A secure cryptocurrency wallet browser extension for the Nexus blockchain, simil
 - 🔒 **Session Management** - Secure login/logout with PIN protection
 
 ### dApp Integration
-- 🌐 **Web3 Provider** - Inject `window.nexus` object for dApp connectivity
+- 🌐 **Web3 Provider** - Inject `window.qWallet` object for dApp connectivity
 - 🤝 **dApp Connections** - Connect your wallet to Nexus-based decentralized applications
 - ✍️ **Transaction Signing** - Sign and approve transactions from dApps
 - 📡 **Message Passing** - Secure communication between dApps and wallet
@@ -142,9 +142,11 @@ Before using the wallet, you need a Nexus node running. You can:
 5. Enter PIN to confirm
 
 **Account Creation Fees:**
-- **Nexus Network Fee:** 0.01 NXS (automatically deducted)
+- **Nexus Account Creation Fee:** 1.0 NXS
+- **Nexus Local Name Creation Fee:** 1.0 NXS (optional to name the account)
+- **Nexus Congestion Fee:** 0.01 NXS (due to Distordia Service Fee debited within 10 seconds)
 - **Distordia Service Fee:** 0.01 NXS
-- Total: 0.02 NXS (deducted from default account)
+- Total: 1.02/2.02 NXS (deducted from default account)
 
 #### View Transactions
 - Check the "Transactions" tab to see your history
@@ -171,20 +173,20 @@ Developers can integrate Nexus Wallet into their dApps using the injected provid
 ### Basic Usage
 
 ```javascript
-// Check if Nexus Wallet is available
-if (typeof window.nexus !== 'undefined') {
-  console.log('Nexus Wallet is installed!');
+// Check if Q-Wallet is available
+if (typeof window.qWallet !== 'undefined') {
+  console.log('Q-Wallet is installed!');
   
   // Connect to wallet
-  const accounts = await window.nexus.connect();
+  const accounts = await window.qWallet.connect();
   console.log('Connected account:', accounts[0]);
   
   // Get balance
-  const balance = await window.nexus.getBalance();
+  const balance = await window.qWallet.getBalance();
   console.log('Balance:', balance);
   
   // Send transaction
-  const tx = await window.nexus.sendTransaction({
+  const tx = await window.qWallet.sendTransaction({
     to: 'recipient-address',
     amount: 10.5,
     reference: 'Payment for services'
@@ -195,13 +197,13 @@ if (typeof window.nexus !== 'undefined') {
 
 ### Available Methods
 
-- `nexus.connect()` - Request connection to wallet
-- `nexus.getAccounts()` - Get connected accounts
-- `nexus.getBalance(account)` - Get account balance
-- `nexus.sendTransaction(params)` - Send a transaction
-- `nexus.signTransaction(tx)` - Sign a transaction
-- `nexus.getTransactionHistory(limit)` - Get transaction history
-- `nexus.isWalletConnected()` - Check connection status
+- `qWallet.connect()` - Request connection to wallet
+- `qWallet.getAccounts()` - Get connected accounts
+- `qWallet.getBalance(account)` - Get account balance
+- `qWallet.sendTransaction(params)` - Send a transaction
+- `qWallet.signTransaction(tx)` - Sign a transaction
+- `qWallet.getTransactionHistory(limit)` - Get transaction history
+- `qWallet.isWalletConnected()` - Check connection status
 
 For complete dApp integration documentation, see [DAPP-INTEGRATION.md](DAPP-INTEGRATION.md).
 

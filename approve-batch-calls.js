@@ -2,7 +2,8 @@
 
 let requestId = null;
 let callsData = null;
-let distFee = 0;
+let nxsFee = 0;
+let totalNxsRequired = 0;
 
 // Initialize popup
 document.addEventListener('DOMContentLoaded', () => {
@@ -11,12 +12,12 @@ document.addEventListener('DOMContentLoaded', () => {
   requestId = params.get('requestId');
   const origin = params.get('origin');
   const callsParam = params.get('calls');
-  distFee = parseFloat(params.get('distFee')) || 1;
+  nxsFee = parseFloat(params.get('nxsFee')) || 0;
   
   try {
     callsData = JSON.parse(callsParam);
   } catch (error) {
-    console.error('[Nexus] Failed to parse calls data:', error.message);
+    console.error('[Q-Wallet] Failed to parse calls data:', error.message);
     showError('Invalid batch calls data');
     return;
   }
@@ -24,10 +25,27 @@ document.addEventListener('DOMContentLoaded', () => {
   // Display details
   document.getElementById('origin').textContent = origin || 'Unknown';
   document.getElementById('total-calls').textContent = callsData.length;
-  document.getElementById('dist-fee').textContent = `${distFee} DIST`;
   
-  // Load DIST accounts
-  loadDistAccounts();
+  // Display fee info
+  if (nxsFee === 0) {
+    document.getElementById('nxs-fee').textContent = 'Free (1 call)';
+  } else {
+    document.getElementById('nxs-fee').textContent = `${nxsFee} NXS`;
+  }
+  
+  // Calculate total NXS required (service fee + congestion fees)
+  // Congestion fee: 0.01 NXS * ((calls - 1) + fee debits)
+  // Fee debits = 1 if nxsFee > 0, else 0
+  const feeDebits = nxsFee > 0 ? 1 : 0;
+  const congestionFeeCount = Math.max(0, callsData.length - 1) + feeDebits;
+  const congestionFee = congestionFeeCount * 0.01;
+  totalNxsRequired = nxsFee + congestionFee;
+  
+  // Display estimated total fees
+  document.getElementById('nexus-fees').textContent = `~${congestionFee.toFixed(2)} NXS (${congestionFeeCount} calls)`;
+  
+  // Check NXS balance
+  checkNxsBalance();
   
   // Populate calls list
   displayCalls();
@@ -54,6 +72,41 @@ document.addEventListener('DOMContentLoaded', () => {
   // Focus PIN input
   document.getElementById('pin-input').focus();
 });
+
+// Check if default NXS account has sufficient balance for fees
+async function checkNxsBalance() {
+  const approveBtn = document.getElementById('approve-btn');
+  const feeNote = document.querySelector('.fee-note');
+  
+  try {
+    // Get default account balance
+    const response = await chrome.runtime.sendMessage({
+      method: 'account.getBalance',
+      params: { account: 'default' }
+    });
+    
+    if (response.error) {
+      throw new Error(response.error);
+    }
+    
+    const balance = parseFloat(response.result?.balance || 0);
+    
+    if (balance < totalNxsRequired) {
+      // Insufficient balance - disable approve button
+      approveBtn.disabled = true;
+      approveBtn.title = `Insufficient NXS balance. Need ${totalNxsRequired.toFixed(4)} NXS, have ${balance.toFixed(4)} NXS`;
+      feeNote.innerHTML = `⚠️ <strong style="color: #f44336;">Insufficient NXS balance.</strong> Need ${totalNxsRequired.toFixed(4)} NXS for fees, but default account only has ${balance.toFixed(4)} NXS.`;
+      feeNote.style.color = '#f44336';
+    } else {
+      approveBtn.disabled = false;
+      approveBtn.title = '';
+    }
+  } catch (error) {
+    console.error('[Q-Wallet] Failed to check NXS balance:', error.message);
+    // Allow approval attempt if balance check fails - backend will catch it
+    approveBtn.disabled = false;
+  }
+}
 
 // Display calls in the list
 function displayCalls() {
@@ -87,56 +140,6 @@ function displayCalls() {
   });
 }
 
-// Load DIST accounts with balance >= 1
-async function loadDistAccounts() {
-  const select = document.getElementById('dist-account-select');
-  const approveBtn = document.getElementById('approve-btn');
-  
-  try {
-    // List all accounts using finance/list/account API
-    const response = await chrome.runtime.sendMessage({
-      method: 'account.listAccounts',
-      params: {}
-    });
-    
-    if (response.error) {
-      throw new Error(response.error);
-    }
-    
-    const accounts = response.result || [];
-    
-    // Filter for DIST accounts with balance >= 1
-    const distAccounts = accounts.filter(account => {
-      const balance = parseFloat(account.balance || 0);
-      return account.ticker === 'DIST' && balance >= 1;
-    });
-    
-    // Clear loading option
-    select.innerHTML = '';
-    
-    if (distAccounts.length === 0) {
-      select.innerHTML = '<option value="">No DIST accounts with sufficient balance</option>';
-      approveBtn.disabled = true;
-      approveBtn.title = 'You need at least 1 DIST token to pay the service fee';
-      return;
-    }
-    
-    // Populate dropdown with DIST accounts
-    distAccounts.forEach(account => {
-      const option = document.createElement('option');
-      option.value = account.address;
-      option.textContent = `${account.name || account.address} (${account.balance} DIST)`;
-      select.appendChild(option);
-    });
-    
-    approveBtn.disabled = false;
-  } catch (error) {
-    console.error('[Nexus] Failed to load DIST accounts:', error.message);
-    select.innerHTML = '<option value="">Error loading accounts</option>';
-    approveBtn.disabled = true;
-  }
-}
-
 // Setup event listeners
 function setupEventListeners() {
   const approveBtn = document.getElementById('approve-btn');
@@ -159,15 +162,9 @@ function setupEventListeners() {
 // Handle approve button
 async function handleApprove() {
   const pin = document.getElementById('pin-input').value;
-  const distAccount = document.getElementById('dist-account-select').value;
   
   if (!pin) {
     alert('Please enter your PIN');
-    return;
-  }
-  
-  if (!distAccount) {
-    alert('Please select a DIST account to pay the service fee');
     return;
   }
   
@@ -180,11 +177,11 @@ async function handleApprove() {
     requestId: requestId,
     approved: true,
     pin: pin,
-    distAccount: distAccount,
+    nxsFee: nxsFee,
     transactionData: {
       origin: document.getElementById('origin').textContent,
       calls: callsData,
-      distFee: distFee
+      nxsFee: nxsFee
     }
   });
 }

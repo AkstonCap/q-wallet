@@ -78,16 +78,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   
   // Handle transaction approval responses
   if (request.type === 'TRANSACTION_APPROVAL_RESPONSE') {
-    const { requestId, approved, pin, distAccount, transactionData } = request;
+    const { requestId, approved, pin, distAccount, nxsFee, transactionData } = request;
     Logger.debug('Transaction approval:', approved ? 'approved' : 'denied');
     
     const pending = pendingTransactionApprovals.get(requestId);
     if (pending) {
-      // Resolve the promise with approval status, PIN, distAccount, and window info
+      // Resolve the promise with approval status, PIN, and window info
       pending.resolve({ 
         approved, 
         pin,
         distAccount,
+        nxsFee,
         transactionData,
         requestId: pending.requestId,
         windowId: pending.windowId
@@ -1083,15 +1084,20 @@ async function handleDAppBatchCalls(params) {
     }
   }
   
-  // Calculate DIST service fee based on number of calls
-  const distFee = 1;
+  // Calculate NXS service fee based on number of calls
+  // First call free, then 0.01 NXS per 10 calls (2-10 = 0.01, 11-20 = 0.02, etc.)
+  let nxsFee = 0;
+  if (calls.length > 1) {
+    const billableCalls = calls.length - 1; // First call is free
+    nxsFee = Math.ceil(billableCalls / 10) * 0.01;
+  }
   
   // Request user approval via popup
   Logger.debug('Requesting batch API calls approval');
   const approval = await requestBatchCallsApproval({
     origin,
     calls,
-    distFee
+    nxsFee
   });
   
   if (!approval.approved) {
@@ -1101,11 +1107,6 @@ async function handleDAppBatchCalls(params) {
   if (!approval.pin) {
     Logger.error('No PIN provided in batch calls approval');
     throw new Error('PIN is required for API calls');
-  }
-  
-  if (!approval.distAccount) {
-    Logger.error('No DIST account selected');
-    throw new Error('DIST account selection is required for fee payment');
   }
   
   // Verify wallet state
@@ -1141,21 +1142,21 @@ async function handleDAppBatchCalls(params) {
     }
   }
   
-  // Charge DIST service fee if any calls succeeded
-  if (results.some(r => r.success)) {
-    const DISTORDIA_PAYMENT_ACCOUNT = 'DIST';
+  // Charge NXS service fee if any calls succeeded and fee is > 0
+  if (nxsFee > 0 && results.some(r => r.success)) {
+    const DISTORDIA_FEE_ADDRESS = '8Csmb3RP227N1NHJDH8QZRjZjobe4udaygp7aNv5VLPWDvLDVD7';
     try {
-      // Debit DIST tokens from selected account
+      // Debit NXS from default account
       await wallet.api.request('finance/debit/account', {
-        from: approval.distAccount,
-        to: DISTORDIA_PAYMENT_ACCOUNT,
-        amount: distFee,
+        from: 'default',
+        to: DISTORDIA_FEE_ADDRESS,
+        amount: nxsFee,
         pin: approval.pin,
         session: wallet.session
       });
-      Logger.info('DIST fee charged:', distFee, 'DIST');
+      Logger.info('NXS fee charged:', nxsFee, 'NXS');
     } catch (feeError) {
-      Logger.error('Failed to charge DIST fee:', feeError.message);
+      Logger.error('Failed to charge NXS fee:', feeError.message);
       // Don't fail the batch if fee payment fails
     }
   }
@@ -1187,7 +1188,7 @@ async function handleDAppBatchCalls(params) {
       totalCalls: calls.length,
       successfulCalls: results.filter(r => r.success).length,
       results: results,
-      distFee: distFee
+      nxsFee: nxsFee
     }
   };
 }
@@ -1277,7 +1278,7 @@ async function requestBatchCallsApproval(batchData) {
       requestId,
       origin: batchData.origin,
       calls: JSON.stringify(batchData.calls),
-      distFee: batchData.distFee
+      nxsFee: batchData.nxsFee
     });
     
     chrome.windows.create({

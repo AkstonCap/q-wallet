@@ -932,16 +932,17 @@ function showPinModal(fromAccount, toAddress, amount, reference) {
   document.getElementById('modal-to-address').title = toAddress; // Full address on hover
   document.getElementById('modal-amount').textContent = `${formatAmount(amount)} ${ticker}`;
   
-  // Update fee row
-  if (distordiaFee === 0) {
-    document.getElementById('modal-fee').textContent = `${formatAmount(nexusFee)} NXS`;
-    document.getElementById('modal-fee-details').textContent = `Nexus: ${formatAmount(nexusFee)}`;
-  } else if (feeInToken) {
+  // Update fee row based on token type
+  if (isNXS) {
+    document.getElementById('modal-fee').textContent = `${formatAmount(totalNXSFees)} NXS`;
+    document.getElementById('modal-fee-details').textContent = `Nexus: ${formatAmount(nexusFee)} + Service: ${formatAmount(distordiaFee)}`;
+  } else if (isUSDD) {
     document.getElementById('modal-fee').textContent = `${formatAmount(distordiaFee)} ${ticker} + ${formatAmount(nexusFee)} NXS`;
     document.getElementById('modal-fee-details').textContent = `Service: ${formatAmount(distordiaFee)} ${ticker} + Nexus: ${formatAmount(nexusFee)} NXS`;
   } else {
-    document.getElementById('modal-fee').textContent = `${formatAmount(totalNXSFees)} NXS`;
-    document.getElementById('modal-fee-details').textContent = `Nexus: ${formatAmount(nexusFee)} + Service: ${formatAmount(distordiaFee)}`;
+    // Other tokens: no fees
+    document.getElementById('modal-fee').textContent = 'None';
+    document.getElementById('modal-fee-details').textContent = '(No service fee for this token)';
   }
   
   // Update total
@@ -950,7 +951,7 @@ function showPinModal(fromAccount, toAddress, amount, reference) {
   } else if (isUSDD) {
     document.getElementById('modal-total').textContent = `${formatAmount(total)} USDD + ${formatAmount(nexusFee)} NXS`;
   } else {
-    document.getElementById('modal-total').textContent = `${formatAmount(amount)} ${ticker} + ${formatAmount(nexusFee)} NXS`;
+    document.getElementById('modal-total').textContent = `${formatAmount(amount)} ${ticker}`;
   }
   
   // Show/hide reference row
@@ -1105,33 +1106,55 @@ function updateTransactionSummary() {
   const selectedOption = select.options[select.selectedIndex];
   const ticker = selectedOption.dataset.ticker || 'NXS';
   const isNXS = ticker === 'NXS';
+  const isUSDD = ticker === 'USDD';
   
   // Calculate Distordia service fee
   let distordiaFee = 0;
+  let feeInToken = false;
+  
   if (isNXS) {
     // NXS: 0.1% of amount, minimum 0.000001 NXS
     distordiaFee = Math.max(amount * 0.001, 0.000001);
+    feeInToken = false;
+  } else if (isUSDD) {
+    // USDD: 0.1% of amount (in USDD), minimum 0.0001 USDD
+    distordiaFee = Math.max(amount * 0.001, 0.0001);
+    feeInToken = true;
   } else {
-    // Other tokens: 0.01 NXS flat fee
-    distordiaFee = 0.01;
+    // Other tokens: No Distordia fee
+    distordiaFee = 0;
   }
   
   // Nexus transaction fee (for multiple transactions within 10 seconds)
   const nexusFee = 0.01;
   
-  // Total fees in NXS
-  const totalFees = distordiaFee + nexusFee;
-  const total = isNXS ? amount + totalFees : amount;
-
-  document.getElementById('summary-amount').textContent = formatAmount(amount) + ' ' + ticker;
-  document.getElementById('summary-fee').textContent = formatAmount(totalFees) + ' NXS';
-  document.getElementById('summary-fee-details').textContent = '(Nexus: ' + formatAmount(nexusFee) + ' + Service: ' + formatAmount(distordiaFee) + ')';
+  // Calculate totals based on token type
+  let total;
+  let feeDisplay;
+  let feeDetails;
+  let totalDisplay;
   
   if (isNXS) {
-    document.getElementById('summary-total').textContent = formatAmount(total) + ' NXS';
+    const totalNXSFees = distordiaFee + nexusFee;
+    total = amount + totalNXSFees;
+    feeDisplay = formatAmount(totalNXSFees) + ' NXS';
+    feeDetails = '(Nexus: ' + formatAmount(nexusFee) + ' + Service: ' + formatAmount(distordiaFee) + ')';
+    totalDisplay = formatAmount(total) + ' NXS';
+  } else if (isUSDD) {
+    feeDisplay = formatAmount(distordiaFee) + ' USDD + ' + formatAmount(nexusFee) + ' NXS';
+    feeDetails = '(Service: ' + formatAmount(distordiaFee) + ' USDD + Nexus: ' + formatAmount(nexusFee) + ' NXS)';
+    totalDisplay = formatAmount(amount + distordiaFee) + ' USDD + ' + formatAmount(nexusFee) + ' NXS';
   } else {
-    document.getElementById('summary-total').textContent = formatAmount(amount) + ' ' + ticker + ' + ' + formatAmount(totalFees) + ' NXS fees';
+    // Other tokens: no fees at all for single transactions
+    feeDisplay = 'None';
+    feeDetails = '(No service fee for this token)';
+    totalDisplay = formatAmount(amount) + ' ' + ticker;
   }
+
+  document.getElementById('summary-amount').textContent = formatAmount(amount) + ' ' + ticker;
+  document.getElementById('summary-fee').textContent = feeDisplay;
+  document.getElementById('summary-fee-details').textContent = feeDetails;
+  document.getElementById('summary-total').textContent = totalDisplay;
 }
 
 // Show receive address

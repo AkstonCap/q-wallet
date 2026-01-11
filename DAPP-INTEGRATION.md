@@ -274,23 +274,24 @@ console.log(`${result.successful} of ${result.total} transactions completed`);
 ### window.qWallet.executeBatchCalls(calls)
 Execute multiple different Nexus API operations in a single approval. This is for advanced use cases where you need to perform multiple API calls (debits, market orders, etc.) atomically with one PIN entry.
 
-**Service Fees (paid in DIST):**
-- 1-4 calls: 1 NXS
-- 5-8 calls: 2 NXS
-- 9-12 calls: 3 NXS
-- Maximum: 12 calls per batch
+**Service Fees (paid in NXS from default account):**
+- 1 call: Free
+- 2-10 calls: 0.01 NXS
+- 11-20 calls: 0.02 NXS
+- 21-30 calls: 0.03 NXS
+- And so on...
 
 **Note:** Nexus blockchain also charges approximately 0.01 NXS per API call when multiple calls are made within 10 seconds.
 
 **Parameters:**
-- `calls` (array): Array of API call objects (max 12), each with:
+- `calls` (array): Array of API call objects, each with:
   - `endpoint` (string): Nexus API endpoint (e.g., 'finance/debit/account', 'market/execute/order')
   - `params` (object): Parameters for that API call
 
 **Returns:** `Promise<object>` - Result with:
   - `successfulCalls` (number): Number of successful operations
   - `totalCalls` (number): Total operations attempted
-  - `distFee` (number): DIST service fee charged
+  - `nxsFee` (number): NXS service fee charged
   - `results` (array): Individual API call results
 
 **Example:**
@@ -316,14 +317,14 @@ const result = await window.qWallet.executeBatchCalls([
 ]);
 
 console.log(`${result.successfulCalls}/${result.totalCalls} operations completed`);
-console.log(`DIST service fee: ${result.distFee} NXS`);
+console.log(`Service fee: ${result.nxsFee} NXS`);
 // Plus ~0.04 NXS Nexus network fee for 4 calls within 10 seconds
 ```
 
 **Important:** 
 - All calls share the same wallet session and PIN
 - Execution stops at first failure
-- DIST service fee is only charged if at least one call succeeds
+- Service fee is only charged if at least one call succeeds
 - User sees all operations and fees in the approval popup
 
 ### window.qWallet.getTransactionHistory(limit)

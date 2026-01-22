@@ -895,21 +895,21 @@ function showPinModal(fromAccount, toAddress, amount, reference) {
   const isNXS = ticker === 'NXS';
   const isUSDD = ticker === 'USDD';
   
-  // Calculate Distordia service fee
+  // Calculate Distordia service fee (only for NXS/USDD amounts > 1)
   const parsedAmount = parseFloat(amount);
   let distordiaFee = 0;
   let feeInToken = false;
   
-  if (isNXS) {
-    // NXS: 0.1% of amount, minimum 0.000001 NXS
+  if (isNXS && parsedAmount > 1) {
+    // NXS: 0.1% of amount (only for amounts > 1 NXS), minimum 0.000001 NXS
     distordiaFee = Math.max(parsedAmount * 0.001, 0.000001);
     feeInToken = false;
-  } else if (isUSDD) {
-    // USDD: 0.1% of amount (in USDD), minimum 0.0001 USDD
+  } else if (isUSDD && parsedAmount > 1) {
+    // USDD: 0.1% of amount in USDD (only for amounts > 1 USDD), minimum 0.0001 USDD
     distordiaFee = Math.max(parsedAmount * 0.001, 0.0001);
     feeInToken = true;
   } else {
-    // Other tokens: No Distordia fee
+    // Other tokens or small amounts: No Distordia fee
     distordiaFee = 0;
   }
   
@@ -932,13 +932,21 @@ function showPinModal(fromAccount, toAddress, amount, reference) {
   document.getElementById('modal-to-address').title = toAddress; // Full address on hover
   document.getElementById('modal-amount').textContent = `${formatAmount(amount)} ${ticker}`;
   
-  // Update fee row based on token type
-  if (isNXS) {
+  // Update fee row based on token type and amount
+  if (isNXS && distordiaFee > 0) {
     document.getElementById('modal-fee').textContent = `${formatAmount(totalNXSFees)} NXS`;
     document.getElementById('modal-fee-details').textContent = `Nexus: ${formatAmount(nexusFee)} + Service: ${formatAmount(distordiaFee)}`;
-  } else if (isUSDD) {
+  } else if (isNXS) {
+    // NXS but amount <= 1, no service fee, congestion fee might apply
+    document.getElementById('modal-fee').textContent = 'None';
+    document.getElementById('modal-fee-details').textContent = '(0.01 NXS congestion fee might apply)';
+  } else if (isUSDD && distordiaFee > 0) {
     document.getElementById('modal-fee').textContent = `${formatAmount(distordiaFee)} ${ticker} + ${formatAmount(nexusFee)} NXS`;
     document.getElementById('modal-fee-details').textContent = `Service: ${formatAmount(distordiaFee)} ${ticker} + Nexus: ${formatAmount(nexusFee)} NXS`;
+  } else if (isUSDD) {
+    // USDD but amount <= 1, no service fee, congestion fee might apply
+    document.getElementById('modal-fee').textContent = 'None';
+    document.getElementById('modal-fee-details').textContent = '(0.01 NXS congestion fee might apply)';
   } else {
     // Other tokens: no fees
     document.getElementById('modal-fee').textContent = 'None';
@@ -946,10 +954,16 @@ function showPinModal(fromAccount, toAddress, amount, reference) {
   }
   
   // Update total
-  if (isNXS) {
+  if (isNXS && distordiaFee > 0) {
     document.getElementById('modal-total').textContent = `${formatAmount(total)} NXS`;
-  } else if (isUSDD) {
+  } else if (isNXS) {
+    // NXS amount <= 1, show just the amount (congestion fee might not apply)
+    document.getElementById('modal-total').textContent = `${formatAmount(parsedAmount)} NXS`;
+  } else if (isUSDD && distordiaFee > 0) {
     document.getElementById('modal-total').textContent = `${formatAmount(total)} USDD + ${formatAmount(nexusFee)} NXS`;
+  } else if (isUSDD) {
+    // USDD amount <= 1, show just the amount (congestion fee might not apply)
+    document.getElementById('modal-total').textContent = `${formatAmount(parsedAmount)} USDD`;
   } else {
     document.getElementById('modal-total').textContent = `${formatAmount(amount)} ${ticker}`;
   }
@@ -1108,20 +1122,20 @@ function updateTransactionSummary() {
   const isNXS = ticker === 'NXS';
   const isUSDD = ticker === 'USDD';
   
-  // Calculate Distordia service fee
+  // Calculate Distordia service fee (only for NXS/USDD amounts > 1)
   let distordiaFee = 0;
   let feeInToken = false;
   
-  if (isNXS) {
-    // NXS: 0.1% of amount, minimum 0.000001 NXS
+  if (isNXS && amount > 1) {
+    // NXS: 0.1% of amount (only for amounts > 1 NXS), minimum 0.000001 NXS
     distordiaFee = Math.max(amount * 0.001, 0.000001);
     feeInToken = false;
-  } else if (isUSDD) {
-    // USDD: 0.1% of amount (in USDD), minimum 0.0001 USDD
+  } else if (isUSDD && amount > 1) {
+    // USDD: 0.1% of amount in USDD (only for amounts > 1 USDD), minimum 0.0001 USDD
     distordiaFee = Math.max(amount * 0.001, 0.0001);
     feeInToken = true;
   } else {
-    // Other tokens: No Distordia fee
+    // Other tokens or small amounts: No Distordia fee
     distordiaFee = 0;
   }
   
@@ -1134,16 +1148,27 @@ function updateTransactionSummary() {
   let feeDetails;
   let totalDisplay;
   
-  if (isNXS) {
+  if (isNXS && distordiaFee > 0) {
     const totalNXSFees = distordiaFee + nexusFee;
     total = amount + totalNXSFees;
     feeDisplay = formatAmount(totalNXSFees) + ' NXS';
     feeDetails = '(Nexus: ' + formatAmount(nexusFee) + ' + Service: ' + formatAmount(distordiaFee) + ')';
     totalDisplay = formatAmount(total) + ' NXS';
-  } else if (isUSDD) {
+  } else if (isNXS) {
+    // NXS but amount <= 1, no service fee, congestion fee might apply
+    total = amount; // Don't assume congestion fee
+    feeDisplay = 'None';
+    feeDetails = '(0.01 NXS congestion fee might apply)';
+    totalDisplay = formatAmount(amount) + ' NXS';
+  } else if (isUSDD && distordiaFee > 0) {
     feeDisplay = formatAmount(distordiaFee) + ' USDD + ' + formatAmount(nexusFee) + ' NXS';
     feeDetails = '(Service: ' + formatAmount(distordiaFee) + ' USDD + Nexus: ' + formatAmount(nexusFee) + ' NXS)';
     totalDisplay = formatAmount(amount + distordiaFee) + ' USDD + ' + formatAmount(nexusFee) + ' NXS';
+  } else if (isUSDD) {
+    // USDD but amount <= 1, no service fee, congestion fee might apply
+    feeDisplay = 'None';
+    feeDetails = '(0.01 NXS congestion fee might apply)';
+    totalDisplay = formatAmount(amount) + ' USDD';
   } else {
     // Other tokens: no fees at all for single transactions
     feeDisplay = 'None';

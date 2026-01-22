@@ -76,12 +76,14 @@ The Wallet does **not** include:
 
 ## Transaction Fees
 
-The Wallet charges service fees for transactions and account creation:
-- **For NXS sends:** 0.1% of amount (minimum 0.000001 NXS)
-- **For token sends:** 0.01 NXS flat fee
-- **For account creation:** 0.01 NXS flat fee
+The Wallet charges service fees only for NXS and USDD transactions above 1 unit:
+- **For NXS sends > 1 NXS:** 0.1% of amount (minimum 0.000001 NXS)
+- **For USDD sends > 1 USDD:** 0.1% of amount in USDD (minimum 0.0001 USDD)
+- **For other tokens or small amounts:** No service fee
+- **For account creation:** No service fee
+- **For batch API calls:** No service fee
 
-These fees are sent to the Distordia development address (`8Csmb3RP227N1NHJDH8QZRjZjobe4udaygp7aNv5VLPWDvLDVD7`) and are visible on the public Nexus blockchain. This is the only way transaction patterns could be associated with the Wallet's usage.
+These fees are sent to the Distordia development address (`8Csmb3RP227N1NHJDH8QZRjZjobe4udaygp7aNv5VLPWDvLDVD7` for NXS, `8BcBZfUd4i4xcVLmQ6uMT3Lp5usJLN2D7TqBavcyYDEQHiteK1H` for USDD) and are visible on the public Nexus blockchain. This is the only way transaction patterns could be associated with the Wallet's usage.
 
 ## Blockchain Transparency
 

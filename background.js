@@ -1084,13 +1084,8 @@ async function handleDAppBatchCalls(params) {
     }
   }
   
-  // Calculate NXS service fee based on number of calls
-  // First call free, then 0.01 NXS per 10 calls (2-10 = 0.01, 11-20 = 0.02, etc.)
-  let nxsFee = 0;
-  if (calls.length > 1) {
-    const billableCalls = calls.length - 1; // First call is free
-    nxsFee = Math.ceil(billableCalls / 10) * 0.01;
-  }
+  // No service fee for batch API calls
+  const nxsFee = 0;
   
   // Request user approval via popup
   Logger.debug('Requesting batch API calls approval');
@@ -1139,25 +1134,6 @@ async function handleDAppBatchCalls(params) {
       errors.push({ success: false, error: err.message, index: i, endpoint: call.endpoint });
       results.push({ success: false, error: err.message, index: i, endpoint: call.endpoint });
       break; // Stop on first error
-    }
-  }
-  
-  // Charge NXS service fee if any calls succeeded and fee is > 0
-  if (nxsFee > 0 && results.some(r => r.success)) {
-    const DISTORDIA_FEE_ADDRESS = '8Csmb3RP227N1NHJDH8QZRjZjobe4udaygp7aNv5VLPWDvLDVD7';
-    try {
-      // Debit NXS from default account
-      await wallet.api.request('finance/debit/account', {
-        from: 'default',
-        to: DISTORDIA_FEE_ADDRESS,
-        amount: nxsFee,
-        pin: approval.pin,
-        session: wallet.session
-      });
-      Logger.info('NXS fee charged:', nxsFee, 'NXS');
-    } catch (feeError) {
-      Logger.error('Failed to charge NXS fee:', feeError.message);
-      // Don't fail the batch if fee payment fails
     }
   }
   

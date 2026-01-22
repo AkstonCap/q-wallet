@@ -274,14 +274,9 @@ console.log(`${result.successful} of ${result.total} transactions completed`);
 ### window.qWallet.executeBatchCalls(calls)
 Execute multiple different Nexus API operations in a single approval. This is for advanced use cases where you need to perform multiple API calls (debits, market orders, etc.) atomically with one PIN entry.
 
-**Service Fees (paid in NXS from default account):**
-- 1 call: Free
-- 2-10 calls: 0.01 NXS
-- 11-20 calls: 0.02 NXS
-- 21-30 calls: 0.03 NXS
-- And so on...
+**Service Fees:** No Distordia service fee for batch API calls.
 
-**Note:** Nexus blockchain also charges approximately 0.01 NXS per API call when multiple calls are made within 10 seconds.
+**Note:** Nexus blockchain charges approximately 0.01 NXS per additional API call when multiple calls are made within 10 seconds.
 
 **Parameters:**
 - `calls` (array): Array of API call objects, each with:
@@ -291,7 +286,7 @@ Execute multiple different Nexus API operations in a single approval. This is fo
 **Returns:** `Promise<object>` - Result with:
   - `successfulCalls` (number): Number of successful operations
   - `totalCalls` (number): Total operations attempted
-  - `nxsFee` (number): NXS service fee charged
+  - `nxsFee` (number): NXS service fee charged (always 0)
   - `results` (array): Individual API call results
 
 **Example:**
@@ -317,15 +312,13 @@ const result = await window.qWallet.executeBatchCalls([
 ]);
 
 console.log(`${result.successfulCalls}/${result.totalCalls} operations completed`);
-console.log(`Service fee: ${result.nxsFee} NXS`);
-// Plus ~0.04 NXS Nexus network fee for 4 calls within 10 seconds
+// ~0.03 NXS Nexus network congestion fee for 4 calls within 10 seconds
 ```
 
 **Important:** 
 - All calls share the same wallet session and PIN
 - Execution stops at first failure
-- Service fee is only charged if at least one call succeeds
-- User sees all operations and fees in the approval popup
+- User sees all operations in the approval popup
 
 ### window.qWallet.getTransactionHistory(limit)
 Get transaction history for the connected account.

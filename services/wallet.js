@@ -364,38 +364,8 @@ class WalletService {
   // Create a new account
   async createAccount(name, token = '0', pin) {
     try {
-      // Check if default account has sufficient balance for fees
-      const nexusFee = 0.01; // Nexus transaction fee (auto-deducted by blockchain)
-      const distordiaFee = 0.01; // Distordia service fee
-      const totalFees = nexusFee + distordiaFee;
-      
-      const nxsBalance = await this.getBalance('default');
-      if (nxsBalance.balance < totalFees) {
-        throw new Error(`Insufficient NXS in default account for fees. Need ${totalFees} NXS (Nexus: ${nexusFee} + Service: ${distordiaFee}).`);
-      }
-      
-      // Create the account first
+      // Create the account (Nexus fee of 1 NXS + 1 NXS (if name creation) + 0.01 NXS (if congestion) is automatically deducted by blockchain)
       const result = await this.api.createAccount(name, token, this.session, pin);
-      
-      // Charge only Distordia service fee
-      // (Nexus fee of 0.01 NXS is automatically deducted by the blockchain)
-      const DISTORDIA_FEE_ADDRESS = '8Csmb3RP227N1NHJDH8QZRjZjobe4udaygp7aNv5VLPWDvLDVD7';
-      
-      try {
-        await this.api.debit(
-          'default', // Debit from default NXS account
-          distordiaFee,
-          DISTORDIA_FEE_ADDRESS,
-          pin,
-          '',
-          this.session
-        );
-      } catch (feeError) {
-        console.error('Failed to charge Distordia service fee:', feeError);
-        // Don't fail the account creation if fee payment fails
-        // but log it for visibility
-      }
-      
       return result;
     } catch (error) {
       console.error('Failed to create account:', error);
@@ -435,18 +405,18 @@ class WalletService {
       let feeInToken = false; // Whether fee is in same token as sending
       const nexusFee = 0.01; // Nexus transaction fee (automatically deducted by blockchain for 2 tx within 10s)
       
-      if (isNXS) {
-        // NXS: 0.1% of send amount, minimum 0.000001 NXS
+      if (isNXS && parsedAmount > 1) {
+        // NXS: 0.1% of send amount (only for amounts > 1 NXS), minimum 0.000001 NXS
         const calculated = parsedAmount * 0.001;
         distordiaFee = Math.max(calculated, 0.000001);
         feeInToken = false; // Fee paid from default NXS account
-      } else if (isUSDD) {
-        // USDD: 0.1% of send amount (in USDD), minimum 0.0001 USDD
+      } else if (isUSDD && parsedAmount > 1) {
+        // USDD: 0.1% of send amount in USDD (only for amounts > 1 USDD), minimum 0.0001 USDD
         const calculated = parsedAmount * 0.001;
         distordiaFee = Math.max(calculated, 0.0001);
         feeInToken = true; // Fee paid from same USDD account
       } else {
-        // Other tokens: No Distordia fee
+        // Other tokens or small amounts: No Distordia fee
         distordiaFee = 0;
       }
       

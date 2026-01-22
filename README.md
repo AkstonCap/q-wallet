@@ -123,16 +123,23 @@ Before using the wallet, you need a Nexus node running. You can:
 
 **Transaction Fees:**
 - **Nexus Network Fee:** 0.01 NXS (automatically deducted for multiple transactions within 10 seconds)
-- **Distordia Service Fee:** 
-  - For NXS: 0.1% of send amount (minimum 0.000001 NXS)
-  - For other tokens: 0.01 NXS flat fee
-- All fees are deducted from your default NXS account
+- **Distordia Service Fee (only for amounts > 1):** 
+  - For NXS sends > 1 NXS: 0.1% of send amount (minimum 0.000001 NXS)
+  - For USDD sends > 1 USDD: 0.1% of send amount in USDD (minimum 0.0001 USDD)
+  - For other tokens or small amounts: No service fee
+- NXS fees are deducted from your default NXS account; USDD fees from the sending account
 
-**Example:** Sending 1 NXS
-- Amount sent: 1 NXS
-- Distordia service fee: 0.001 NXS (0.1%)
-- Nexus network fee: 0.01 NXS (auto-deducted)
-- Total cost: 1.011 NXS
+**Example:** Sending 10 NXS
+- Amount sent: 10 NXS
+- Distordia service fee: 0.01 NXS (0.1%)
+- Nexus network congestion fee: 0.01 NXS (auto-deducted)
+- Total cost: 10.02 NXS
+
+**Example:** Sending 0.5 NXS (no service fee)
+- Amount sent: 0.5 NXS
+- Distordia service fee: None (amount ≤ 1 NXS)
+- Nexus network congestion fee: 0.01 NXS (auto-deducted only if additional transactions during last 10 seconds)
+- Total cost: 0.50-0.51 NXS
 
 #### Create Accounts
 1. Go to "Receive" screen
@@ -144,9 +151,8 @@ Before using the wallet, you need a Nexus node running. You can:
 **Account Creation Fees:**
 - **Nexus Account Creation Fee:** 1.0 NXS
 - **Nexus Local Name Creation Fee:** 1.0 NXS (optional to name the account)
-- **Nexus Congestion Fee:** 0.01 NXS (due to Distordia Service Fee debited within 10 seconds)
-- **Distordia Service Fee:** 0.01 NXS
-- Total: 1.02/2.02 NXS (deducted from default account)
+- **No Distordia Service Fee**
+- Total: 1.0/2.0 NXS (deducted from default account)
 
 #### View Transactions
 - Check the "Transactions" tab to see your history

@@ -26,23 +26,17 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('origin').textContent = origin || 'Unknown';
   document.getElementById('total-calls').textContent = callsData.length;
   
-  // Display fee info
-  if (nxsFee === 0) {
-    document.getElementById('nxs-fee').textContent = 'Free (1 call)';
-  } else {
-    document.getElementById('nxs-fee').textContent = `${nxsFee} NXS`;
-  }
+  // No Distordia service fee for batch API calls
+  document.getElementById('nxs-fee').textContent = 'None';
   
-  // Calculate total NXS required (service fee + congestion fees)
-  // Congestion fee: 0.01 NXS * ((calls - 1) + fee debits)
-  // Fee debits = 1 if nxsFee > 0, else 0
-  const feeDebits = nxsFee > 0 ? 1 : 0;
-  const congestionFeeCount = Math.max(0, callsData.length - 1) + feeDebits;
+  // Calculate total NXS required (only Nexus congestion fees)
+  // Congestion fee: 0.01 NXS * (calls - 1) for transactions within 10 seconds
+  const congestionFeeCount = Math.max(0, callsData.length - 1);
   const congestionFee = congestionFeeCount * 0.01;
-  totalNxsRequired = nxsFee + congestionFee;
+  totalNxsRequired = congestionFee;
   
   // Display estimated total fees
-  document.getElementById('nexus-fees').textContent = `~${congestionFee.toFixed(2)} NXS (${congestionFeeCount} calls)`;
+  document.getElementById('nexus-fees').textContent = `~${congestionFee.toFixed(2)} NXS (${congestionFeeCount} extra calls)`;
   
   // Check NXS balance
   checkNxsBalance();

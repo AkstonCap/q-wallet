@@ -457,11 +457,15 @@ async function checkNodeStatus(context = 'login') {
   const indicator = document.getElementById(`${prefix}status-indicator`);
   const statusText = document.getElementById(`${prefix}status-text`);
   const statusDetails = document.getElementById(`${prefix}status-details`);
+  const nodeType = document.getElementById(`${prefix}node-type`);
   
   if (!indicator || !statusText || !statusDetails) {
     console.error('Node status elements not found for context:', context);
     return;
   }
+  
+  // Clear node type initially
+  if (nodeType) nodeType.textContent = '';
 
   try {
     let nodeUrl = context === 'settings' 
@@ -519,6 +523,7 @@ async function checkNodeStatus(context = 'login') {
       statusText.textContent = 'HTTP blocked';
       statusText.style.color = '#f44336';
       statusDetails.textContent = 'Not secure';
+      if (nodeType) nodeType.textContent = '';
       return;
     }
     
@@ -531,6 +536,22 @@ async function checkNodeStatus(context = 'login') {
     // Green: synchronized is true
     // Yellow: synchronized is false and syncing is true
     // Red: error or neither condition met
+    
+    // Determine node type (private, hybrid, or public)
+    // Handle both direct response and result-wrapped response
+    const resultData = info.result || info;
+    const isPrivate = resultData.private || false;
+    const isHybrid = resultData.hybrid || false;
+    let nodeTypeLabel = 'Public';
+    if (isPrivate) nodeTypeLabel = 'Private';
+    else if (isHybrid) nodeTypeLabel = 'Hybrid';
+    
+    console.log('Node type detection:', { isPrivate, isHybrid, nodeTypeLabel, resultData });
+    
+    if (nodeType) {
+      nodeType.textContent = nodeTypeLabel;
+      nodeType.title = `Node type: ${nodeTypeLabel}`;
+    }
     
     if (synchronized) {
       indicator.textContent = '🟢';
@@ -559,6 +580,7 @@ async function checkNodeStatus(context = 'login') {
     statusText.textContent = 'Offline';
     statusText.style.color = '#f44336';
     statusDetails.textContent = '';
+    if (nodeType) nodeType.textContent = '';
   }
 }
 

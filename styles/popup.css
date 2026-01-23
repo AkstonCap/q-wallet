@@ -115,6 +115,19 @@ body {
   margin-left: auto;
 }
 
+.node-type {
+  color: #fff;
+  font-size: 11px;
+  padding: 2px 6px;
+  background: rgba(100, 150, 255, 0.3);
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.node-type:empty {
+  display: none;
+}
+
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }

@@ -237,6 +237,7 @@
     }
 
     // Send NXS or tokens
+    // reference: Optional 64-bit unsigned integer (0 to 18446744073709551615) for order/invoice tracking
     async sendTransaction({ from, to, amount, reference }) {
       try {
         // Build params object with only defined values
@@ -247,7 +248,7 @@
           params.from = from;
         }
         
-        // Only include reference if provided and not empty
+        // Only include reference if provided, must be a valid number (validated by nexus-api.js)
         if (reference !== undefined && reference !== null && reference !== '') {
           params.reference = reference;
         }

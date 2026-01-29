@@ -198,7 +198,7 @@
       <h3>5. Send Transaction</h3>
       <input type="text" id="send-to" placeholder="Recipient address or username">
       <input type="number" id="send-amount" placeholder="Amount (NXS)" step="0.01" min="0">
-      <input type="text" id="send-reference" placeholder="Reference (optional)">
+      <input type="number" id="send-reference" placeholder="Reference (optional, integer)" min="0" step="1">
       <button id="send-btn" onclick="sendTransaction()" disabled>Send Transaction</button>
       
       <div id="tx-result" style="display: none;">
@@ -224,11 +224,11 @@
       <p>Send multiple transactions with a single approval</p>
       <input type="text" id="batch-tx-to-1" placeholder="Transaction 1: Recipient">
       <input type="number" id="batch-tx-amount-1" placeholder="Transaction 1: Amount" step="0.01" min="0">
-      <input type="text" id="batch-tx-ref-1" placeholder="Transaction 1: Reference (optional)">
+      <input type="number" id="batch-tx-ref-1" placeholder="Transaction 1: Reference (optional, integer)" min="0" step="1">
       <br>
       <input type="text" id="batch-tx-to-2" placeholder="Transaction 2: Recipient">
       <input type="number" id="batch-tx-amount-2" placeholder="Transaction 2: Amount" step="0.01" min="0">
-      <input type="text" id="batch-tx-ref-2" placeholder="Transaction 2: Reference (optional)">
+      <input type="number" id="batch-tx-ref-2" placeholder="Transaction 2: Reference (optional, integer)" min="0" step="1">
       <button id="batch-tx-btn" onclick="sendBatchTx()" disabled>Send Batch Transactions</button>
       
       <div id="batch-tx-result" style="display: none;">
@@ -290,7 +290,7 @@ if (typeof window.qWallet !== 'undefined') {
   const tx = await window.qWallet.sendTransaction({
     to: 'recipient-address',
     amount: 10.5,
-    reference: 'Payment'
+    reference: 12345  // Optional: 64-bit unsigned integer
   });
   console.log('Transaction:', tx);
 }</code></pre>
@@ -606,7 +606,8 @@ if (typeof window.qWallet !== 'undefined') {
       try {
         const to = document.getElementById('send-to').value.trim();
         const amount = parseFloat(document.getElementById('send-amount').value);
-        const reference = document.getElementById('send-reference').value.trim();
+        const referenceStr = document.getElementById('send-reference').value.trim();
+        const reference = referenceStr ? parseInt(referenceStr, 10) : undefined;
 
         if (!to || !amount) {
           alert('Please enter recipient and amount');
@@ -615,11 +616,16 @@ if (typeof window.qWallet !== 'undefined') {
 
         updateStatus('Sending transaction...', '');
         
-        const result = await window.qWallet.sendTransaction({
+        const txParams = {
           to: to,
-          amount: amount,
-          reference: reference
-        });
+          amount: amount
+        };
+        // Only include reference if it's a valid non-negative integer
+        if (reference !== undefined && !isNaN(reference) && reference >= 0) {
+          txParams.reference = reference;
+        }
+        
+        const result = await window.qWallet.sendTransaction(txParams);
 
         document.getElementById('tx-data').textContent = JSON.stringify(result, null, 2);
         document.getElementById('tx-result').style.display = 'block';
@@ -675,11 +681,13 @@ if (typeof window.qWallet !== 'undefined') {
       try {
         const to1 = document.getElementById('batch-tx-to-1').value.trim();
         const amount1 = parseFloat(document.getElementById('batch-tx-amount-1').value);
-        const ref1 = document.getElementById('batch-tx-ref-1').value.trim();
+        const ref1Str = document.getElementById('batch-tx-ref-1').value.trim();
+        const ref1 = ref1Str ? parseInt(ref1Str, 10) : undefined;
         
         const to2 = document.getElementById('batch-tx-to-2').value.trim();
         const amount2 = parseFloat(document.getElementById('batch-tx-amount-2').value);
-        const ref2 = document.getElementById('batch-tx-ref-2').value.trim();
+        const ref2Str = document.getElementById('batch-tx-ref-2').value.trim();
+        const ref2 = ref2Str ? parseInt(ref2Str, 10) : undefined;
 
         if (!to1 || !amount1 || !to2 || !amount2) {
           alert('Please fill in both transactions (recipient and amount required)');
@@ -692,12 +700,12 @@ if (typeof window.qWallet !== 'undefined') {
           {
             to: to1,
             amount: amount1,
-            ...(ref1 && { reference: ref1 })
+            ...(ref1 !== undefined && !isNaN(ref1) && ref1 >= 0 && { reference: ref1 })
           },
           {
             to: to2,
             amount: amount2,
-            ...(ref2 && { reference: ref2 })
+            ...(ref2 !== undefined && !isNaN(ref2) && ref2 >= 0 && { reference: ref2 })
           }
         ];
 

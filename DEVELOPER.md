@@ -216,10 +216,10 @@ Send NXS transaction (requires user PIN approval).
 **Parameters:**
 ```javascript
 {
-  from: string,      // Sender account name
-  to: string,        // Recipient address or username
-  amount: number,    // Amount in NXS
-  reference?: string // Optional memo
+  from: string,       // Sender account name (optional, defaults to 'default')
+  to: string,         // Recipient address or username
+  amount: number,     // Amount in NXS
+  reference?: number  // Optional: 64-bit unsigned integer (0 to 18446744073709551615)
 }
 ```
 
@@ -257,6 +257,116 @@ Check if wallet is connected.
 **Example:**
 ```javascript
 const connected = await window.qWallet.isWalletConnected();
+```
+
+### window.qWallet.disconnect()
+Disconnect the site from the wallet.
+
+**Returns:** `Promise<object>` - Result with success status
+
+**Example:**
+```javascript
+await window.qWallet.disconnect();
+```
+
+### window.qWallet.listAccounts()
+List all accounts for the logged in user, including token accounts.
+
+**Returns:** `Promise<Array<object>>` - Array of account objects
+
+**Example:**
+```javascript
+const accounts = await window.qWallet.listAccounts();
+accounts.forEach(a => console.log(a.name, a.balance));
+```
+
+### window.qWallet.getAllBalances()
+Get all token balances for the connected wallet.
+
+**Returns:** `Promise<Array<object>>` - Array of balance objects
+
+**Example:**
+```javascript
+const balances = await window.qWallet.getAllBalances();
+```
+
+### window.qWallet.isLoggedIn()
+Check if wallet is logged in (without requesting connection).
+
+**Returns:** `Promise<boolean>`
+
+**Example:**
+```javascript
+const loggedIn = await window.qWallet.isLoggedIn();
+```
+
+### window.qWallet.connectWithFee(feeConfig)
+Connect with a token fee requirement.
+
+**Parameters:**
+```javascript
+{
+  tokenName: string,       // Token ticker (e.g., 'DIST')
+  amount: number,          // Fee amount
+  recipientAddress: string,// Address to receive fee
+  validitySeconds: number  // How long fee remains valid
+}
+```
+
+**Returns:** `Promise<string[]>` - Array of account addresses
+
+**Example:**
+```javascript
+const accounts = await window.qWallet.connectWithFee({
+  tokenName: 'DIST',
+  amount: 1,
+  recipientAddress: '8ABC...XYZ',
+  validitySeconds: 43200
+});
+```
+
+### window.qWallet.sendBatchTransactions(transactions)
+Send multiple transactions with single PIN approval.
+
+**Parameters:**
+- `transactions` (array): Array of transaction objects
+
+**Returns:** `Promise<object>` - Result with successful/failed counts
+
+**Example:**
+```javascript
+const result = await window.qWallet.sendBatchTransactions([
+  { to: 'alice', amount: 10 },
+  { to: 'bob', amount: 20 }
+]);
+```
+
+### window.qWallet.executeBatchCalls(calls)
+Execute multiple API operations with single PIN approval.
+
+**Parameters:**
+- `calls` (array): Array of API call objects with `endpoint` and `params`
+
+**Returns:** `Promise<object>` - Result with operation counts
+
+**Example:**
+```javascript
+const result = await window.qWallet.executeBatchCalls([
+  { endpoint: 'finance/debit/account', params: { from: 'default', to: 'recipient', amount: 10 } }
+]);
+```
+
+### window.qWallet.signTransaction(transaction)
+Sign a transaction without broadcasting.
+
+**Parameters:**
+- `transaction` (object): Transaction to sign
+
+**Returns:** `Promise<object>` - Signed transaction
+
+**Example:**
+```javascript
+const signed = await window.qWallet.signTransaction({ to: 'recipient', amount: 10 });
 ```
 
 ## Common Patterns

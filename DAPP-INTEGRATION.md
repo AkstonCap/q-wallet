@@ -234,7 +234,7 @@ Request to send a transaction. Shows approval popup to user with PIN requirement
 - `params.from` (string, optional): Sender account name, defaults to 'default'
 - `params.to` (string): Recipient address or username
 - `params.amount` (number): Amount to send in NXS
-- `params.reference` (integer, optional): Transaction memo (64-bit unsigned integer or omit)
+- `params.reference` (number, optional): 64-bit unsigned integer (0 to 18446744073709551615) for order/invoice reference. Omit if not needed.
 
 **Returns:** `Promise<object>` - Transaction result with txid
 
@@ -244,7 +244,7 @@ const result = await window.qWallet.sendTransaction({
   from: 'default',
   to: 'recipient',
   amount: 10.5,
-  reference: 12345
+  reference: 12345  // Optional: 64-bit unsigned integer
 });
 console.log('TX:', result.txid);
 ```
@@ -257,7 +257,7 @@ Send multiple debit transactions in a single approval. All transactions share th
   - `from` (string, optional): Sender account name or address, defaults to 'default'
   - `to` (string): Recipient address or username:accountName (must be same token as from)
   - `amount` (number): Amount to send in token
-  - `reference` (integer, optional): Transaction memo (64-bit unsigned integer or omit)
+  - `reference` (number, optional): 64-bit unsigned integer (0 to 18446744073709551615). Omit if not needed.
 
 **Returns:** `Promise<object>` - Result with successful and failed transactions
 
@@ -355,6 +355,73 @@ console.log('Successfully disconnected from wallet');
 ```
 
 **Note:** This allows a site to programmatically disconnect itself. Users can also revoke connections manually from the wallet Settings → Connected Sites.
+
+### window.qWallet.connectWithFee(feeConfig)
+Request connection with a token fee requirement. Useful for dApps that require users to hold or pay a token fee to access premium features. The fee payment is verified before granting access.
+
+**Parameters:**
+- `feeConfig.tokenName` (string): Token ticker (e.g., 'DIST', 'NXS')
+- `feeConfig.amount` (number): Amount of tokens required
+- `feeConfig.recipientAddress` (string): Address to receive the fee payment
+- `feeConfig.validitySeconds` (number): How long the fee payment remains valid
+
+**Returns:** `Promise<Array<string>>` - Array of account names/addresses
+
+**Example:**
+```javascript
+const accounts = await window.qWallet.connectWithFee({
+  tokenName: 'DIST',
+  amount: 1,
+  recipientAddress: '8ABC...XYZ',
+  validitySeconds: 43200 // 12 hours
+});
+console.log('Connected with fee:', accounts[0]);
+```
+
+### window.qWallet.isLoggedIn()
+Check if the wallet is logged in without requesting a connection. This is useful to check wallet state before prompting for connection.
+
+**Returns:** `Promise<boolean>` - True if wallet is logged in, false otherwise
+
+**Example:**
+```javascript
+const loggedIn = await window.qWallet.isLoggedIn();
+if (loggedIn) {
+  console.log('Wallet is logged in, can request connection');
+} else {
+  console.log('Please log in to your Q-Wallet first');
+}
+```
+
+### window.qWallet.getAllBalances()
+Get all token balances for the connected wallet. Returns balances across all tokens the user holds.
+
+**Returns:** `Promise<Array<object>>` - Array of balance objects with token info
+
+**Example:**
+```javascript
+const balances = await window.qWallet.getAllBalances();
+balances.forEach(b => {
+  console.log(`${b.ticker}: ${b.confirmed} (confirmed)`);
+});
+```
+
+### window.qWallet.signTransaction(transaction)
+Sign a transaction without broadcasting it. Useful for offline signing or multi-signature workflows.
+
+**Parameters:**
+- `transaction` (object): Transaction object to sign
+
+**Returns:** `Promise<object>` - Signed transaction object
+
+**Example:**
+```javascript
+const signed = await window.qWallet.signTransaction({
+  to: 'recipient',
+  amount: 10
+});
+console.log('Signed transaction:', signed);
+```
 
 ## Error Handling
 

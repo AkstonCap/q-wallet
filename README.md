@@ -117,7 +117,7 @@ Before using the wallet, you need a Nexus node running. You can:
 1. Click the "Send" button
 2. Enter recipient address or username
 3. Enter amount to send
-4. Add optional reference/memo
+4. Add optional reference number (64-bit integer for invoice/order tracking)
 5. Review transaction summary including fees
 6. Confirm transaction with PIN
 
@@ -195,7 +195,7 @@ if (typeof window.qWallet !== 'undefined') {
   const tx = await window.qWallet.sendTransaction({
     to: 'recipient-address',
     amount: 10.5,
-    reference: 'Payment for services'
+    reference: 12345  // Optional: 64-bit unsigned integer
   });
   console.log('Transaction:', tx);
 }
@@ -204,12 +204,19 @@ if (typeof window.qWallet !== 'undefined') {
 ### Available Methods
 
 - `qWallet.connect()` - Request connection to wallet
+- `qWallet.connectWithFee(feeConfig)` - Connect with token fee requirement
+- `qWallet.disconnect()` - Disconnect site from wallet
 - `qWallet.getAccounts()` - Get connected accounts
+- `qWallet.listAccounts()` - List all user accounts with details
 - `qWallet.getBalance(account)` - Get account balance
+- `qWallet.getAllBalances()` - Get all token balances
 - `qWallet.sendTransaction(params)` - Send a transaction
+- `qWallet.sendBatchTransactions(txs)` - Send multiple transactions
+- `qWallet.executeBatchCalls(calls)` - Execute multiple API operations
 - `qWallet.signTransaction(tx)` - Sign a transaction
 - `qWallet.getTransactionHistory(limit)` - Get transaction history
 - `qWallet.isWalletConnected()` - Check connection status
+- `qWallet.isLoggedIn()` - Check if wallet is logged in
 
 For complete dApp integration documentation, see [DAPP-INTEGRATION.md](DAPP-INTEGRATION.md).
 
